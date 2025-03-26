@@ -1,91 +1,103 @@
 export type Bracket = 'curly' | 'square' | 'round';
 
 export enum TokenType {
-    /** Обычный текстовый фрагмент */
-    Text = 'text',
+  /** Обычный текстовый фрагмент */
+  Text = 'text',
 
-    /** Ссылка на внешний ресурс */
-    Link = 'link',
+  /** Ссылка на внешний ресурс */
+  Link = 'link',
 
-    /** Упоминание: @user_name */
-    Mention = 'mention',
+  /** Упоминание: @user_name */
+  Mention = 'mention',
 
-    /** Хэштэг: #hashtag */
-    HashTag = 'hashtag',
+  /** Хэштэг: #hashtag */
+  HashTag = 'hashtag',
 
-    /** Перенос строки */
-    Newline = 'newline'
+  /** Перенос строки */
+  Newline = 'newline',
+
+  Formula = 'formula',
 }
 
 export enum TokenFormat {
-    None = 0,
+  None = 0,
 
-    /** Жирный текст */
-    Bold = 1 << 0,
+  /** Жирный текст */
+  Bold = 1 << 0,
 
-    /** Курсивный текст */
-    Italic = 1 << 1,
+  /** Курсивный текст */
+  Italic = 1 << 1,
 
-    /** Подчёркнутый текст */
-    Underline = 1 << 2,
+  /** Подчёркнутый текст */
+  Underline = 1 << 2,
 
-    /** Перечёркнутый текст */
-    Strike = 1 << 3,
+  /** Перечёркнутый текст */
+  Strike = 1 << 3,
 
-    /** Моноширинный текст */
-    Monospace = 1 << 4,
+  /** Моноширинный текст */
+  Monospace = 1 << 4,
 }
 
-export type Token = TokenText | TokenLink | TokenMention | TokenHashTag | TokenNewline;
+export type Token =
+  | TokenText
+  | TokenLink
+  | TokenMention
+  | TokenHashTag
+  | TokenNewline
+  | TokenFormula;
 
 export interface TokenBase {
-    /** Тип токена */
-    type: TokenType;
+  /** Тип токена */
+  type: TokenType;
 
-    /** Текстовое содержимое токена */
-    value: string;
+  /** Текстовое содержимое токена */
+  value: string;
 
-    /** Текущий формат токена */
-    format: TokenFormat;
+  /** Текущий формат токена */
+  format: TokenFormat;
 
-    /** Список эмоджи внутри значения токена */
-    emoji?: Emoji[];
+  /** Список эмоджи внутри значения токена */
+  emoji?: Emoji[];
 }
 
 export interface TokenText extends TokenBase {
-    type: TokenType.Text;
+  type: TokenType.Text;
 }
 
 export interface TokenLink extends TokenBase {
-    type: TokenType.Link;
+  type: TokenType.Link;
 
-    /** Значение ссылки */
-    link: string;
+  /** Значение ссылки */
+  link: string;
 
-    /**
-     * Флаг, означающий, что ссылка была автоматически распознана в тексте,
-     * а не добавлена пользователем.
-     */
-    auto: boolean;
+  /**
+   * Флаг, означающий, что ссылка была автоматически распознана в тексте,
+   * а не добавлена пользователем.
+   */
+  auto: boolean;
 }
 
 export interface TokenMention extends TokenBase {
-    type: TokenType.Mention;
+  type: TokenType.Mention;
 }
 
 export interface TokenHashTag extends TokenBase {
-    type: TokenType.HashTag;
+  type: TokenType.HashTag;
 }
 
 export interface TokenNewline extends TokenBase {
-    type: TokenType.Newline;
+  type: TokenType.Newline;
+}
+
+export interface TokenFormula extends TokenBase {
+  type: TokenType.Formula;
 }
 
 export interface Emoji {
-    /** Начало эмоджи в родительском токене */
-    from: number;
-    /** Конец эмоджи в родительском токене */
-    to: number;
-    /** Фактический эмоджи для указанного диапазона. Используется для текстовых эмоджи (алиасов) */
-    emoji?: string;
+  /** Начало эмоджи в родительском токене */
+  from: number;
+  /** Конец эмоджи в родительском токене */
+  to: number;
+  /** Фактический эмоджи для указанного диапазона. Используется для текстовых эмоджи (алиасов) */
+  emoji?: string;
 }
