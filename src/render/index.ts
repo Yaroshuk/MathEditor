@@ -1,3 +1,4 @@
+import { MathfieldElement } from 'mathlive';
 import { isAutoLink, isCustomLink } from '../formatting/utils';
 import type {
   Emoji,
@@ -242,9 +243,24 @@ class ReconcileState {
    */
   elem(name: string): HTMLElement {
     let node = this.container.childNodes[this.pos];
+    console.log(node, node?.nodeType, name)
 
     if (!isElement(node) || node.localName !== name) {
       node = document.createElement(name);
+      console.log('ddd')
+      insertAt(this.container, node, this.pos);
+    }
+    this.pos++;
+    return node as HTMLElement;
+  }
+
+  mathfield(): HTMLElement {
+    let node = this.container.childNodes[this.pos];
+    console.log(node, node?.nodeType)
+
+    if (!isElement(node) || node.localName !== 'mathfield') {
+      node = new MathfieldElement();
+      console.log('ddd')
       insertAt(this.container, node, this.pos);
     }
     this.pos++;
@@ -360,7 +376,9 @@ function renderTokenContainer(
     elem.setAttribute('href', getLink(token));
     elem.setAttribute('target', '_blank');
   } else if (isFurmulaToken(token)) {
-    elem = state.elem('div');
+    elem = new MathfieldElement();
+    elem.value = "\\frac{\\pi}{2}"
+    console.log(elem)
   } else {
     elem = state.elem('span');
   }
