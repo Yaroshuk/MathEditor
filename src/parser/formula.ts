@@ -1,24 +1,29 @@
 import { TokenFormat, TokenType } from './types';
 import type ParserState from './state';
-import { Codes, consumeIdentifier, isDelimiter } from './utils';
+import { Codes } from './utils';
 
 export default function parseFormula(state: ParserState): boolean {
-  if (state.atWordBound()) {
-    const { pos } = state;
-    if (state.consume(Codes.Dollar)) {
-      // Разрешаем поглотить самостоятельный символ `@`, чтобы показывать
-      // его в редакторе и при необходимости вывести автокомплит
-      if (isDelimiter(state.peek())) {
-        state.push({
-          type: TokenType.Formula,
-          format: TokenFormat.None,
-          value: state.substring(pos),
-        });
-        return true;
-      }
-    }
+  const { pos } = state;
+
+  if (state.consumeLog(Codes.Dollar)) {
+    // if (state.consume(Codes.Dollar)) {
+    // Разрешаем поглотить самостоятельный символ `@`, чтобы показывать
+    // его в редакторе и при необходимости вывести автокомплит
+    state.push({
+      type: TokenType.Formula,
+      format: TokenFormat.None,
+      value: '$',
+    });
+    state.pushFormula({
+      type: TokenType.Text,
+      format: TokenFormat.None,
+      value: ' ',
+    });
 
     //state.pos = pos;
+
+    return true;
+    // }
   }
 
   return false;

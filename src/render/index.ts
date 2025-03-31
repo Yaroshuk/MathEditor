@@ -57,7 +57,6 @@ export default function render(elem: HTMLElement, tokens: Token[]): void {
       state.container.setAttribute('data-raw', token.value);
     } else {
       i = renderTokens(tokens, i, state);
-      console.log('i', i);
     }
   }
 
@@ -120,13 +119,12 @@ function renderTokens(
 }
 
 function renderMathToken(token: Token, state: ReconcileState) {
-  const elem = state.mathfield();
+  // const elem = document.createElement('div');
 
-  state.container.blur();
-  elem.innerHTML = '\\frac{\\pi}{2}';
+  const math = state.mathfield();
+  // math.innerHTML = '\\frac{\\pi}{2}';
 
-  elem.autofocus = true;
-  elem.focus();
+  // elem.appendChild(math);
 }
 
 function renderTextToken(
@@ -266,13 +264,19 @@ class ReconcileState {
   mathfield(): HTMLElement {
     let node = this.container.childNodes[this.pos] as HTMLElement;
 
-    console.log(this.container.childNodes, this.container.children);
-
-    console.log('node', node, isElement(node), node?.localName);
-
     if (!isElement(node) || node.localName !== 'mathfield') {
-      //node = document.createElement('div')
+      //const span = document.createElement('span');
+
       node = new MathfieldElement();
+
+      node.autofocus = true;
+      node.focus();
+      node.value = '\\frac{\\pi}{2}';
+      node.setAttribute('data-raw', ' ');
+      node.oninput = () => {
+        console.log('INPUT');
+      };
+
       // const mathfield = new MathfieldElement();
       // mathfield.value = '';
       // node.appendChild(mathfield);
@@ -386,8 +390,6 @@ function renderTokenContainer(
   state: ReconcileState
 ): HTMLElement {
   let elem: HTMLElement;
-
-  console.log('renderToken', token);
 
   // Ссылки рисуем только если нет моноширинного текста
   if (isRenderLink(token)) {

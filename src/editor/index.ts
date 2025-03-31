@@ -92,6 +92,10 @@ export default class Editor {
   }
 
   private onKeyDown = (evt: KeyboardEvent) => {
+    if (evt.target.nodeName === 'MATH-FIELD') {
+      evt.stopPropagation();
+      return;
+    }
     if (!evt.defaultPrevented) {
       this.shortcuts.handle(evt);
     }
@@ -114,11 +118,11 @@ export default class Editor {
 
   private onBeforeInput = (evt: InputEvent) => {
     if (evt.target.nodeName === 'MATH-FIELD') {
+      evt.stopPropagation();
       return;
     }
 
     if (evt.data === '$') {
-      console.log('evt.data');
       this.blur();
     }
 
@@ -178,9 +182,7 @@ export default class Editor {
     } else {
       // Обычное изменение, сразу применяем результат к UI
       const range = getTextRange(this.element)!;
-      console.log(range);
       if (evt.data === '$') {
-        console.log('evt.data');
         this.blur();
         this.updateModel(nextModel, getDiffTypeFromEvent(evt), range);
       } else {
