@@ -380,7 +380,6 @@ test('edit link', () => {
     const t2 = removeText(t1, 0, 4);
     equal(types(t2), [TokenType.Text]);
     equal(values(t2), ['bar']);
-    // console.log(tokens);
 });
 
 test('insert text before link', () => {

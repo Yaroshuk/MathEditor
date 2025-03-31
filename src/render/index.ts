@@ -39,6 +39,7 @@ export default function render(elem: HTMLElement, tokens: Token[]): void {
     if (state.pos === 0) {
       // Пустая строка, оставляем <br>, чтобы строка отобразилась
       state.elem('br');
+      state.container.blur();
     }
     state.trim();
   };
@@ -76,7 +77,6 @@ function renderTokens(
   i: number,
   state: ReconcileState
 ): number {
-    console.log(tokens)
   const token = tokens[i];
   if (!token.value) {
     // Скорее всего sticky-токен, пропускаем
@@ -243,28 +243,26 @@ class ReconcileState {
    */
   elem(name: string): HTMLElement {
     let node = this.container.childNodes[this.pos];
-    console.log(node, node?.nodeType, name)
-
     if (!isElement(node) || node.localName !== name) {
       node = document.createElement(name);
-      console.log('ddd')
       insertAt(this.container, node, this.pos);
     }
     this.pos++;
     return node as HTMLElement;
   }
 
-  mathfield(): HTMLElement {
-    let node = this.container.childNodes[this.pos];
-    console.log(node, node?.nodeType)
+  mathfield(): MathfieldElement {
+    let node = this.container.childNodes[this.pos] as MathfieldElement;
 
     if (!isElement(node) || node.localName !== 'mathfield') {
-      node = new MathfieldElement();
-      console.log('ddd')
+      const node = new MathfieldElement() as MathfieldElement;
+      node.value = '\\frac{\\pi}{2}';
+      node.autofocus = true
+      node.focus();
       insertAt(this.container, node, this.pos);
     }
-    this.pos++;
-    return node as HTMLElement;
+    //this.pos++;
+    return node as MathfieldElement;
   }
 
   /**
@@ -290,6 +288,7 @@ class ReconcileState {
   }
 
   enter(elem: HTMLElement): void {
+    console.dir(elem);
     this.save();
     this.prepare(elem);
   }
@@ -369,16 +368,13 @@ function renderTokenContainer(
 ): HTMLElement {
   let elem: HTMLElement;
 
-  console.log(token);
   // Ссылки рисуем только если нет моноширинного текста
   if (isRenderLink(token)) {
     elem = state.elem('a');
     elem.setAttribute('href', getLink(token));
     elem.setAttribute('target', '_blank');
   } else if (isFurmulaToken(token)) {
-    elem = new MathfieldElement();
-    elem.value = "\\frac{\\pi}{2}"
-    console.log(elem)
+    elem = state.mathfield();
   } else {
     elem = state.elem('span');
   }

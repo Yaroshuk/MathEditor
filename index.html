@@ -7,7 +7,19 @@
     <title>Vite App</title>
   </head>
   <body>
-    
+    <math-field>e^{i\pi}</math-field>
+    <div id="container">
+      = a \left( x - \frac{-b + \sqrt {b^2-4ac}}{2a} \right) \left( x - \frac{-b
+      - \sqrt {b^2-4ac}}{2a} \right)
+    </div>
+    <script type="math/tex; mode=text">
+      =  a
+      \left( x - \frac{-b + \sqrt {b^2-4ac}}{2a} \right)
+      \left( x - \frac{-b - \sqrt {b^2-4ac}}{2a} \right)
+    </script>
+    <math-field read-only style="display: inline-block">
+      x=\frac{-b\pm \sqrt{b^2-4ac}}{2a}
+    </math-field>
     <div id="editor"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
