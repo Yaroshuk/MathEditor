@@ -39,7 +39,6 @@ export default function render(elem: HTMLElement, tokens: Token[]): void {
     if (state.pos === 0) {
       // Пустая строка, оставляем <br>, чтобы строка отобразилась
       state.elem('br');
-      state.container.blur();
     }
     state.trim();
   };
@@ -58,6 +57,7 @@ export default function render(elem: HTMLElement, tokens: Token[]): void {
       state.container.setAttribute('data-raw', token.value);
     } else {
       i = renderTokens(tokens, i, state);
+      console.log('i', i);
     }
   }
 
@@ -109,12 +109,24 @@ function renderTokens(
     state.text(token.value);
   } else if (isPlainText(token)) {
     renderText(token, state);
+  } else if (token.type === TokenType.Formula) {
+    renderMathToken(token, state);
   } else {
     const elem = renderTokenContainer(token, state);
     renderTextToken(elem, token, state);
   }
 
   return i;
+}
+
+function renderMathToken(token: Token, state: ReconcileState) {
+  const elem = state.mathfield();
+
+  state.container.blur();
+  elem.innerHTML = '\\frac{\\pi}{2}';
+
+  elem.autofocus = true;
+  elem.focus();
 }
 
 function renderTextToken(
@@ -251,18 +263,25 @@ class ReconcileState {
     return node as HTMLElement;
   }
 
-  mathfield(): MathfieldElement {
-    let node = this.container.childNodes[this.pos] as MathfieldElement;
+  mathfield(): HTMLElement {
+    let node = this.container.childNodes[this.pos] as HTMLElement;
+
+    console.log(this.container.childNodes, this.container.children);
+
+    console.log('node', node, isElement(node), node?.localName);
 
     if (!isElement(node) || node.localName !== 'mathfield') {
-      const node = new MathfieldElement() as MathfieldElement;
-      node.value = '\\frac{\\pi}{2}';
-      node.autofocus = true
-      node.focus();
+      //node = document.createElement('div')
+      node = new MathfieldElement();
+      // const mathfield = new MathfieldElement();
+      // mathfield.value = '';
+      // node.appendChild(mathfield);
+      // node.autofocus = true;
+      // node.focus();
       insertAt(this.container, node, this.pos);
     }
-    //this.pos++;
-    return node as MathfieldElement;
+    this.pos++;
+    return node as HTMLElement;
   }
 
   /**
@@ -367,6 +386,8 @@ function renderTokenContainer(
   state: ReconcileState
 ): HTMLElement {
   let elem: HTMLElement;
+
+  console.log('renderToken', token);
 
   // Ссылки рисуем только если нет моноширинного текста
   if (isRenderLink(token)) {

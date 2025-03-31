@@ -8,7 +8,7 @@ export default function parseFormula(state: ParserState): boolean {
     if (state.consume(Codes.Dollar)) {
       // Разрешаем поглотить самостоятельный символ `@`, чтобы показывать
       // его в редакторе и при необходимости вывести автокомплит
-      if (consumeIdentifier(state) || isDelimiter(state.peek())) {
+      if (isDelimiter(state.peek())) {
         state.push({
           type: TokenType.Formula,
           format: TokenFormat.None,
@@ -18,7 +18,7 @@ export default function parseFormula(state: ParserState): boolean {
       }
     }
 
-    state.pos = pos;
+    //state.pos = pos;
   }
 
   return false;

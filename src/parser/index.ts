@@ -10,6 +10,7 @@ import formula from './formula';
 
 export default function parse(text: string): Token[] {
   const state = new ParserState(text);
+  console.log('parse', text, state);
 
   while (state.hasNext()) {
     newline(state) ||

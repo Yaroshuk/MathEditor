@@ -114,9 +114,12 @@ export default class Editor {
 
   private onBeforeInput = (evt: InputEvent) => {
     if (evt.target.nodeName === 'MATH-FIELD') {
-      evt.stopPropagation();
-      this.element.blur();
       return;
+    }
+
+    if (evt.data === '$') {
+      console.log('evt.data');
+      this.blur();
     }
 
     this.startRange = null;
@@ -162,10 +165,6 @@ export default class Editor {
       return;
     }
 
-    if (evt.data === '$') {
-      this.blur();
-    }
-
     this.expectEnter = false;
     const nextModel = updateFromInputEvent(
       this.composition || this.model,
@@ -179,9 +178,17 @@ export default class Editor {
     } else {
       // Обычное изменение, сразу применяем результат к UI
       const range = getTextRange(this.element)!;
-      this.updateModel(nextModel, getDiffTypeFromEvent(evt), range);
-      this.setSelection(range[0], range[1]);
+      console.log(range);
+      if (evt.data === '$') {
+        console.log('evt.data');
+        this.blur();
+        this.updateModel(nextModel, getDiffTypeFromEvent(evt), range);
+      } else {
+        this.updateModel(nextModel, getDiffTypeFromEvent(evt), range);
+        this.setSelection(range[0], range[1]);
+      }
     }
+
     this.pendingText = undefined;
   };
 
@@ -344,7 +351,7 @@ export default class Editor {
   }
 
   blur(): void {
-    console.log('11blur')
+    console.log('11blur');
     this.element.blur();
     this.focused = false;
   }
