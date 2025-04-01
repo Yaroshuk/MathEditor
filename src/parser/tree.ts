@@ -26,7 +26,7 @@ export function consumeTree(state: ParserState, tree: Tree, ignoreCase = false):
     const { pos } = state;
     let node = tree;
     let ch: number;
-    let entry: Tree | true | undefined;
+    let entry: Tree | true;
 
     while (state.hasNext()) {
         ch = state.next();
@@ -50,13 +50,6 @@ export function consumeTree(state: ParserState, tree: Tree, ignoreCase = false):
     return false;
 }
 
-/**
- * Собираем дерево из указанной строки
- * @param tree Контейнер, в который нужно собирать дерево
- * @param text Строка, из которой собираем дерево
- * @param ignoreCase Игнорировать регистр для латинских ASCII-символов
- * @param i Позиция в строке, и которой нужно собирать дерево
- */
 function collectTree(tree: Tree, text: string, ignoreCase: boolean, i = 0): void {
     let ch = text.charCodeAt(i++);
     if (ignoreCase) {

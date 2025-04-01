@@ -1,130 +1,213 @@
-import { MathfieldElement } from 'mathlive';
-import { isAutoLink, isCustomLink } from '../formatting/utils';
+import { MathfieldElement } from "mathlive";
+import { isAutoLink, isCustomLink } from "../formatted-string/utils";
 import type {
-  Emoji,
-  Token,
-  TokenHashTag,
-  TokenLink,
-  TokenMention,
-  TokenText,
-} from '../parser';
-import { TokenFormat, TokenType } from '../parser';
-import { TokenFormula } from '../parser/types';
+    Emoji,
+    Token,
+    TokenHashTag,
+    TokenLink,
+    TokenMention,
+    TokenCommand,
+    TokenText,
+} from "../parser";
+import { TokenFormat, TokenType } from "../parser";
+import type { EmojiData, TokenFormula } from "../parser/types";
+import { objectMerge } from "../utils/objectMerge";
 
 type ClassFormat = [type: TokenFormat, value: string];
+export type EmojiRender = (
+    emoji: string | null,
+    elem?: Element,
+    rawEmoji?: string,
+    emojiData?: EmojiData
+) => Element | void;
+
+export interface RenderOptions {
+    /**
+     * Функция для отрисовки эмоджи
+     * @param emoji Эмоджи, который нужно нарисовать. Если указано `null`, значит,
+     * элемент с эмоджи сейчас удаляется и нужно подчистить ресурсы для него
+     * @param elem Существующий элемент, в котором нужно обновить эмоджи. Если не
+     * указан, его нужно создать
+     */
+    emoji?: EmojiRender;
+
+    /**
+     * Обработчик ссылок: принимает токен ссылки и должен вернуть значение для
+     * атрибута `href`. На вход может быть несколько типов токенов: Link, Hashtag
+     */
+    link: (token: Token) => string;
+
+    /**
+     * Нужно ли исправлять завершающий перевод строки.
+     * Используется для режима редактирования, когда для отображения
+     * последнего перевода строки нужно добавить ещё один
+     */
+    fixTrailingLine: boolean;
+
+    /** Заменять текстовые смайлы на эмоджи */
+    replaceTextEmoji: boolean;
+
+    /** Заменяем все пробелы и переводы строк на неразрывный пробел */
+    nowrap?: boolean;
+
+    /** Отрисовать содержимое в контексте инлайн-блока
+     * (без переводов строк и блочных элементов) */
+    inline?: boolean;
+}
+
 type ReconcileStateStack = [elem: HTMLElement, pos: number];
 
 const formats: ClassFormat[] = [
-  [TokenFormat.Bold, 'bold'],
-  [TokenFormat.Italic, 'italic'],
-  [TokenFormat.Monospace, 'monospace'],
-  [TokenFormat.Strike, 'strike'],
-  [TokenFormat.Underline, 'underline'],
+    [TokenFormat.Bold, "bold"],
+    [TokenFormat.Italic, "italic"],
+    [TokenFormat.Monospace, "monospace"],
+    [TokenFormat.Strike, "strike"],
+    [TokenFormat.Underline, "underline"],
+    [TokenFormat.Heading, "heading"],
+    [TokenFormat.Marked, "marked"],
+    [TokenFormat.Highlight, "highlight"],
+    [TokenFormat.Link, "md-link"],
+    [TokenFormat.LinkLabel, "md-link-label"],
 ];
 
 const tokenTypeClass: Record<TokenType, string> = {
-  [TokenType.HashTag]: 'hashtag',
-  [TokenType.Link]: 'link',
-  [TokenType.Mention]: 'mention',
-  [TokenType.Text]: '',
-  [TokenType.Newline]: 'newline',
-  [TokenType.Formula]: 'formula',
+    [TokenType.Command]: "command",
+    [TokenType.HashTag]: "hashtag",
+    [TokenType.Link]: "link",
+    [TokenType.Markdown]: "md",
+    [TokenType.Mention]: "mention",
+    [TokenType.Text]: "",
+    [TokenType.UserSticker]: "user-sticker",
+    [TokenType.Newline]: "newline",
+    [TokenType.Formula]: "",
 };
 
-export default function render(elem: HTMLElement, tokens: Token[]): void {
-  const lineState = new ReconcileState(elem);
-  const line = () => lineState.elem('div');
-  const state = new ReconcileState(line());
-  const finalizeLine = () => {
-    if (state.pos === 0) {
-      // Пустая строка, оставляем <br>, чтобы строка отобразилась
-      state.elem('br');
+const defaultOptions: RenderOptions = {
+    fixTrailingLine: false,
+    replaceTextEmoji: false,
+    link: getLink,
+};
+
+export default function render(
+    elem: HTMLElement,
+    tokens: Token[],
+    opt?: Partial<RenderOptions>
+): void {
+    console.log("www", tokens);
+
+    const options: RenderOptions = opt
+        ? objectMerge(defaultOptions, opt)
+        : defaultOptions;
+
+    if (options.inline) {
+        renderInline(elem, tokens, options);
+        return;
     }
-    state.trim();
-  };
 
-  // На случай непредвиденных модификаций дерева убедимся, что у первой строки
-  // всегда отсутствует атрибут data-raw
-  state.container.removeAttribute('data-raw');
+    const lineState = new ReconcileState(elem, options);
+    const line = () => lineState.elem("div");
+    const state = new ReconcileState(line(), options);
+    const finalizeLine = () => {
+        if (state.pos === 0) {
+            // Пустая строка, оставляем <br>, чтобы строка отобразилась
+            state.elem("br");
+        }
+        state.trim();
+    };
 
-  for (let i = 0; i < tokens.length; i++) {
-    const token = tokens[i];
+    // На случай непредвиденных модификаций дерева убедимся, что у первой строки
+    // всегда отсутствует атрибут data-raw
+    state.container.removeAttribute("data-raw");
 
-    if (token.type === TokenType.Newline) {
-      // Переход на новую строку
-      finalizeLine();
-      state.prepare(line());
-      state.container.setAttribute('data-raw', token.value);
-    } else {
-      i = renderTokens(tokens, i, state);
+    for (let i = 0; i < tokens.length; i++) {
+        const token = tokens[i];
+
+        if (token.type === TokenType.Newline) {
+            // Переход на новую строку
+            finalizeLine();
+            state.prepare(line());
+            state.container.setAttribute("data-raw", token.value);
+        } else {
+            i = renderTokens(tokens, i, state);
+        }
     }
-  }
 
-  finalizeLine();
-  lineState.trim();
+    finalizeLine();
+    lineState.trim();
 }
 
-/**
- * Функция для отрисовки списка токенов в указанном стэйте
- * @param tokens Список токенов для отрисовки
- * @param i Позиция токена, с которой начать отрисовку
- * @param state Текущий стэйт для согласования отрисовки
- * @returns
- */
+function renderInline(
+    elem: HTMLElement,
+    tokens: Token[],
+    options: RenderOptions
+) {
+    const state = new ReconcileState(elem, options);
+    state.enter(state.elem("span"));
+    for (let i = 0; i < tokens.length; i++) {
+        i = renderTokens(tokens, i, state);
+    }
+    state.exit();
+    state.trim();
+}
+
 function renderTokens(
-  tokens: Token[],
-  i: number,
-  state: ReconcileState
+    tokens: Token[],
+    i: number,
+    state: ReconcileState
 ): number {
-    console.log(tokens)
-  const token = tokens[i];
-  if (!token.value) {
-    // Скорее всего sticky-токен, пропускаем
-    return i;
-  }
-
-  const groupEnd = nextInGroup(tokens, i);
-  if (groupEnd !== i) {
-    // Можем схлопнуть несколько токенов в один
-    const baseFormat = token.format;
-    state.enter(renderTokenContainer(token, state));
-
-    while (i <= groupEnd) {
-      const innerToken = tokens[i];
-      if (innerToken.format === baseFormat) {
-        renderText(innerToken, state);
-      } else {
-        const innerElem = state.elem('span');
-        innerElem.className = formatClassNames(innerToken.format);
-        renderTextToken(innerElem, innerToken, state);
-      }
-      i++;
+    const token = tokens[i];
+    if (!token.value) {
+        // Скорее всего sticky-токен, пропускаем
+        return i;
     }
 
-    state.exit();
-    return groupEnd;
-  }
+    const groupEnd = nextInGroup(tokens, i);
+    if (groupEnd !== i) {
+        console.log("GROUP");
+        // Можем схлопнуть несколько токенов в один
+        const baseFormat = token.format;
+        state.enter(renderTokenContainer(token, state));
 
-  if (token.type === TokenType.Newline) {
-    state.text(token.value);
-  } else if (isPlainText(token)) {
-    renderText(token, state);
-  } else {
-    const elem = renderTokenContainer(token, state);
-    renderTextToken(elem, token, state);
-  }
+        while (i <= groupEnd) {
+            const innerToken = tokens[i];
+            if (innerToken.format === baseFormat) {
+                renderText(innerToken, state);
+            } else {
+                const innerElem = state.elem("span");
+                innerElem.className = formatClassNames(innerToken.format);
+                renderTextToken(innerElem, innerToken, state);
+            }
+            i++;
+        }
 
-  return i;
+        state.exit();
+        return groupEnd;
+    }
+
+    console.log("GROUP2", token.type, token.value);
+    if (token.type === TokenType.Newline) {
+        state.text(token.value);
+    } else if (isPlainText(token)) {
+        renderText(token, state);
+    } else {
+        const elem = renderTokenContainer(token, state);
+
+        if (token.type !== TokenType.UserSticker && !isFormulaToken(token)) {
+            renderTextToken(elem, token, state);
+        }
+    }
+
+    return i;
 }
 
 function renderTextToken(
-  target: HTMLElement,
-  token: Token,
-  state: ReconcileState
+    target: HTMLElement,
+    token: Token,
+    state: ReconcileState
 ): void {
-  state.enter(target);
-  renderText(token, state);
-  state.exit();
+    state.enter(target);
+    renderText(token, state);
+    state.exit();
 }
 
 /**
@@ -132,198 +215,258 @@ function renderTextToken(
  * внутри токена
  */
 function renderText(token: Token, state: ReconcileState): void {
-  let { value, emoji } = token;
+    let { emoji } = token;
+    let { value } = token;
+    const { options } = state;
 
-  if (emoji && token.format & TokenFormat.Monospace) {
-    // Для monospace не делаем замену текстовых эмоджи: уберём их из списка
-    emoji = emoji.filter(isEmojiSymbol);
-  }
-
-  if (emoji?.length) {
-    // Есть эмоджи, нужно назбить текстовый узел на фрагменты и заменить эмоджи
-    // на элементы
-    let offset = 0;
-
-    emoji.forEach((emojiToken) => {
-      const text = value.slice(offset, emojiToken.from);
-      const rawEmoji = value.slice(emojiToken.from, emojiToken.to);
-      const emoji = emojiToken.emoji || rawEmoji;
-
-      if (text) {
-        state.text(text);
-      }
-
-      state.emoji(emoji, rawEmoji);
-      offset = emojiToken.to;
-    });
-
-    const tail = value.slice(offset);
-    if (tail) {
-      state.text(tail);
+    if (options.nowrap) {
+        // Для однострочных полей всегда заменяем пробельные символы на
+        // на nbsp
+        value = value.replace(/\r\n?/g, "\n").replace(/[\s\n]/g, "\u00a0");
     }
-  } else {
-    state.text(value);
-  }
+
+    if (emoji && options.emoji) {
+        // Есть эмоджи, нужно назбить текстовый узел на фрагменты и заменить эмоджи
+        // на элементы
+
+        let offset = 0;
+
+        if (!options.replaceTextEmoji || token.format & TokenFormat.Monospace) {
+            // Для monospace не заменяем текстовые эмоджи, также не заменяем их,
+            // если отключена опция
+            emoji = emoji.filter(isEmojiSymbol);
+        }
+
+        emoji.forEach((emojiToken) => {
+            const text = value.slice(offset, emojiToken.from);
+            const rawEmoji = value.slice(emojiToken.from, emojiToken.to);
+            const emoji = emojiToken.emoji || rawEmoji;
+
+            if (text) {
+                state.text(text);
+            }
+
+            state.emoji(emoji, rawEmoji, emojiToken.emojiData);
+            offset = emojiToken.to;
+        });
+
+        const tail = value.slice(offset);
+        if (tail) {
+            state.text(tail);
+        }
+    } else {
+        state.text(value);
+    }
 }
 
 /**
  * Возвращает список классов форматирования для указанного формата токена
  */
 function formatClassNames(format: TokenFormat): string {
-  let result = '';
-  let glue = '';
+    let result = "";
+    let glue = "";
 
-  // Укажем классы с форматированием
-  formats.forEach(([f, value]) => {
-    if (format & f) {
-      result += glue + value;
-      glue = ' ';
-    }
-  });
+    // Укажем классы с форматированием
+    formats.forEach(([f, value]) => {
+        if (format & f) {
+            result += glue + value;
+            glue = " ";
+        }
+    });
 
-  return result;
+    return result;
 }
 
 function joinClassNames(classNames: string[]): string {
-  let result = '';
-  let glue = '';
-  classNames.forEach((cl) => {
-    if (cl) {
-      result += glue + cl;
-      glue = ' ';
-    }
-  });
+    let result = "";
+    let glue = "";
+    classNames.forEach((cl) => {
+        if (cl) {
+            result += glue + cl;
+            glue = " ";
+        }
+    });
 
-  return result;
+    return result;
 }
 
 /**
  * Добавляет указанный узел `node` в позицию `pos` потомков `elem`
  */
 function insertAt<T extends Node>(elem: HTMLElement, child: T, pos: number): T {
-  const curChild = elem.childNodes[pos];
-  if (curChild) {
-    elem.insertBefore(child, curChild);
-  } else {
-    elem.appendChild(child);
-  }
+    const curChild = elem.childNodes[pos];
+    if (curChild) {
+        elem.insertBefore(child, curChild);
+    } else {
+        elem.appendChild(child);
+    }
 
-  return child;
+    return child;
+}
+
+/**
+ * Удаляет указанный DOM-узел
+ */
+function remove(node: ChildNode, emoji?: EmojiRender): void {
+    if (emoji && isElement(node)) {
+        cleanUpEmoji(node, emoji);
+    }
+    node.remove();
 }
 
 class ReconcileState {
-  /** Указатель на текущую позицию потомка внутри `container` */
-  public pos = 0;
-  private stack: ReconcileStateStack[] = [];
+    /** Указатель на текущую позицию потомка внутри `container` */
+    public pos = 0;
+    private stack: ReconcileStateStack[] = [];
+    constructor(public container: HTMLElement, public options: RenderOptions) {}
 
-  constructor(public container: HTMLElement) {}
-
-  /**
-   * Ожидает текстовый узел в позиции `pos`. Если его нет, то автоматически создаст
-   * со значением `value`, а если есть, то обновит значение на `value`
-   */
-  text(value: string): Text {
-    let node = this.container.childNodes[this.pos];
-
-    if (node?.nodeType === 3) {
-      if (node.nodeValue !== value) {
-        node.nodeValue = value;
-      }
-    } else {
-      node = document.createTextNode(value);
-      insertAt(this.container, node, this.pos);
+    /**
+     * Ожидает текстовый узел в позиции `pos`. Если его нет, то автоматически создаст
+     * со значением `value`, а если есть, то обновит значение на `value`
+     */
+    text(value: string): Text {
+        let node = this.container.childNodes[this.pos];
+        if (node?.nodeType === 3) {
+            if (node.nodeValue !== value) {
+                node.nodeValue = value;
+            }
+        } else {
+            node = document.createTextNode(value);
+            insertAt(this.container, node, this.pos);
+        }
+        this.pos++;
+        return node as Text;
     }
-    this.pos++;
-    return node as Text;
-  }
 
-  /**
-   * Ожидает элемент с именем `name` в текущей позиции. Если его нет, то создаст
-   * такой
-   */
-  elem(name: string): HTMLElement {
-    let node = this.container.childNodes[this.pos];
-    console.log(node, node?.nodeType, name)
+    /**
+     * Ожидает элемент с указанным эмоджи, при необходимости создаёт или обновляет его
+     */
+    emoji(
+        actualEmoji: string,
+        rawEmoji: string,
+        emojiData?: EmojiData
+    ): Element | void {
+        const { emoji } = this.options;
+        const node = this.container.childNodes[this.pos];
+        const isCurEmoji = node ? isEmoji(node) : false;
+        const next = emoji(
+            actualEmoji,
+            isCurEmoji ? (node as Element) : null,
+            rawEmoji,
+            emojiData
+        );
 
-    if (!isElement(node) || node.localName !== name) {
-      node = document.createElement(name);
-      console.log('ddd')
-      insertAt(this.container, node, this.pos);
+        if (next) {
+            if (node !== next) {
+                insertAt(this.container, next, this.pos);
+                if (isCurEmoji) {
+                    remove(node, emoji);
+                }
+            }
+            markAsEmoji(next);
+            next.setAttribute("data-raw", rawEmoji);
+            this.pos++;
+            return next;
+        } else if (isCurEmoji) {
+            remove(node, emoji);
+        }
     }
-    this.pos++;
-    return node as HTMLElement;
-  }
 
-  mathfield(): HTMLElement {
-    let node = this.container.childNodes[this.pos];
-    console.log(node, node?.nodeType)
-
-    if (!isElement(node) || node.localName !== 'mathfield') {
-      node = new MathfieldElement();
-      console.log('ddd')
-      insertAt(this.container, node, this.pos);
+    /**
+     * Ожидает элемент с именем `name` в текущей позиции. Если его нет, то создаст
+     * такой
+     */
+    elem(name: string): HTMLElement {
+        let node = this.container.childNodes[this.pos];
+        if (!isElement(node) || node.localName !== name) {
+            node = document.createElement(name);
+            insertAt(this.container, node, this.pos);
+        }
+        this.pos++;
+        return node as HTMLElement;
     }
-    this.pos++;
-    return node as HTMLElement;
-  }
 
-  /**
-   * Ожидает элемент с указанным эмоджи, при необходимости создаёт или обновляет его
-   */
-  emoji(actualEmoji: string, rawEmoji: string): Element | void {
-    const node = this.container.childNodes[this.pos];
-    const next = renderEmoji(
-      actualEmoji,
-      node && isEmoji(node) ? node : undefined
-    );
+    mathfield(): HTMLElement {
+        let node = this.container.childNodes[this.pos] as HTMLElement;
+        console.log("NODE", node);
 
-    if (node !== next) {
-      insertAt(this.container, next, this.pos);
+        if (!isElement(node) || node?.dataset?.type !== "formula") {
+            console.log("create");
+            node = document.createElement("button");
+
+            //node.body.appendChild(bomNode);
+            node.contentEditable = "false";
+            node.style.userSelect = "all";
+            node.style.display = "inline-block";
+            //node.style.position = 'relative';
+
+            const mathinput = new MathfieldElement();
+
+            // mathinput.autofocus = true;
+            // mathinput.focus();
+            //mathinput.innerHTML = '&#xfeff;';
+            mathinput.value = Math.random().toString();
+            // mathinput.contentEditable = "false";
+            // mathinput.style.userSelect = "none";
+            // mathinput.style.display = "inline-block";
+            // mathinput.style.position = 'relative';
+
+            // node.innerHTML += '&#xfeff;';
+            node.setAttribute("data-raw", "$");
+            node.setAttribute("data-type", "formula");
+            node.oninput = () => {
+                console.log("INPUT");
+            };
+
+            node.append(mathinput);
+
+            insertAt(this.container, node, this.pos);
+        }
+
+        this.pos++;
+        return node as HTMLElement;
     }
-    next.setAttribute('data-raw', rawEmoji);
-    this.pos++;
-    return next;
-  }
 
-  save(): void {
-    this.stack.push([this.container, this.pos]);
-  }
-
-  enter(elem: HTMLElement): void {
-    this.save();
-    this.prepare(elem);
-  }
-
-  exit(): void {
-    this.trim();
-    this.restore();
-  }
-
-  restore(): void {
-    const entry = this.stack.pop();
-    if (entry) {
-      this.container = entry[0];
-      this.pos = entry[1];
+    save(): void {
+        this.stack.push([this.container, this.pos]);
     }
-  }
 
-  /**
-   * Удаляет все дочерние элементы контейнера, которые находятся правее точки `pos`
-   */
-  trim(): void {
-    while (this.pos < this.container.childNodes.length) {
-      this.container.childNodes[this.pos].remove();
+    enter(elem: HTMLElement): void {
+        this.save();
+        this.prepare(elem);
     }
-  }
 
-  prepare(container: HTMLElement) {
-    this.container = container;
-    this.pos = 0;
-  }
+    exit(): void {
+        this.trim();
+        this.restore();
+    }
+
+    restore(): void {
+        const entry = this.stack.pop();
+        if (entry) {
+            this.container = entry[0];
+            this.pos = entry[1];
+        }
+    }
+
+    /**
+     * Удаляет все дочерние элементы контейнера, которые находятся правее точки `pos`
+     */
+    trim(): void {
+        const { emoji } = this.options;
+        while (this.pos < this.container.childNodes.length) {
+            remove(this.container.childNodes[this.pos], emoji);
+        }
+    }
+
+    prepare(container: HTMLElement) {
+        this.container = container;
+        this.pos = 0;
+    }
 }
 
 function isElement(node?: Node): node is HTMLElement {
-  return node?.nodeType === 1;
+    return node?.nodeType === 1;
 }
 
 /**
@@ -332,148 +475,136 @@ function isElement(node?: Node): node is HTMLElement {
  * в единый `<a>` элемент ссылку с внутренним форматированием
  */
 export function nextInGroup(tokens: Token[], pos: number): number {
-  const cur = tokens[pos];
+    const cur = tokens[pos];
 
-  while (pos < tokens.length - 1 && canGroup(cur, tokens[pos + 1])) {
-    pos++;
-  }
+    while (pos < tokens.length - 1 && canGroup(cur, tokens[pos + 1])) {
+        pos++;
+    }
 
-  return pos;
+    return pos;
 }
 
 /**
  * Вернёт `true`, если два токена можно сгруппировать в один
  */
 function canGroup(t1: Token, t2: Token): boolean {
-  if (t1 === t2) {
-    return true;
-  }
+    if (t1 === t2) {
+        return true;
+    }
 
-  if (t1.type === t2.type) {
-    return (
-      (t1.type === TokenType.Link && t1.link === (t2 as TokenLink).link) ||
-      (t1.type === TokenType.Mention && t1.value === t2.value) ||
-      (t1.type === TokenType.HashTag && t1.value === t2.value)
-    );
-  }
+    if (t1.type === t2.type) {
+        return (
+            (t1.type === TokenType.Link &&
+                t1.link === (t2 as TokenLink).link) ||
+            (t1.type === TokenType.Mention &&
+                t1.mention === (t2 as TokenMention).mention) ||
+            (t1.type === TokenType.HashTag &&
+                t1.hashtag === (t2 as TokenHashTag).hashtag)
+        );
+    }
 
-  return false;
+    return false;
 }
 
 /**
  * Отрисовывает контейнер для указанного токена
  */
 function renderTokenContainer(
-  token: Token,
-  state: ReconcileState
+    token: Token,
+    state: ReconcileState
 ): HTMLElement {
-  let elem: HTMLElement;
+    let elem: HTMLElement;
 
-  console.log(token);
-  // Ссылки рисуем только если нет моноширинного текста
-  if (isRenderLink(token)) {
-    elem = state.elem('a');
-    elem.setAttribute('href', getLink(token));
-    elem.setAttribute('target', '_blank');
-  } else if (isFurmulaToken(token)) {
-    elem = new MathfieldElement();
-    elem.value = "\\frac{\\pi}{2}"
-    console.log(elem)
-  } else {
-    elem = state.elem('span');
-  }
+    // Ссылки рисуем только если нет моноширинного текста
+    if (isRenderLink(token)) {
+        elem = state.elem("a");
+        elem.setAttribute("href", state.options.link(token));
+        elem.setAttribute("target", "_blank");
+        elem.addEventListener("mouseenter", onLinkEnter);
+        elem.addEventListener("mouseleave", onLinkLeave);
+    } else if (token.type === TokenType.UserSticker && state.options.emoji) {
+        elem = state.emoji(token.value, token.value) as HTMLElement;
+    } else if (isFormulaToken(token)) {
+        elem = state.mathfield();
+    } else {
+        elem = state.elem("span");
+    }
 
-  elem.className = joinClassNames([
-    getTokenTypeClass(token),
-    formatClassNames(token.format),
-  ]);
+    elem.className = joinClassNames([
+        getTokenTypeClass(token),
+        formatClassNames(token.format),
+    ]);
 
-  return elem;
+    return elem;
 }
 
 function isEmojiSymbol(emoji: Emoji): boolean {
-  return emoji.emoji === undefined;
+    return emoji.emoji === undefined;
 }
 
-export function isEmoji(elem: Node): elem is HTMLImageElement {
-  return elem.nodeType === 1 && elem.nodeName === 'IMG';
+export function isEmoji(elem: Node): elem is Element {
+    return elem.nodeType === 1
+        ? (elem as Element).hasAttribute("data-emoji")
+        : false;
+}
+
+function markAsEmoji(elem: Element) {
+    elem.setAttribute("data-emoji", "");
 }
 
 /**
- * Для указанного эмоджи возвращает имя файла для картинки с эмоджи, которая лежит
- * на CDN портала ok.ru
+ * Очищает ресурсы эмоджи внутри указанном элементе
  */
-function emojiFileName(emoji: string): string {
-  const codePoints: string[] = [];
-  let i = 0;
-  let cp = 0;
-  while (i < emoji.length) {
-    cp = emoji.codePointAt(i)!;
-    i += cp > 0xffff ? 2 : 1;
-
-    if (cp !== 0xfe0f && cp !== 0x200d) {
-      codePoints.push(cp.toString(16));
+function cleanUpEmoji(elem: Element, emoji: EmojiRender): void {
+    const walker = document.createTreeWalker(elem, NodeFilter.SHOW_ELEMENT);
+    let node: Element;
+    while ((node = walker.nextNode() as Element)) {
+        if (isEmoji(node)) {
+            emoji(null, node);
+        }
     }
-  }
 
-  return codePoints.join('-');
-}
-
-/**
- * Тестовая функция для проверки вывода эмоджи как картинки
- */
-function renderEmoji(emoji: string, elem?: Element) {
-  const url = `https://st.mycdn.me/static/emoji/13-1-0/20/${emojiFileName(
-    emoji
-  )}@2x.png`;
-  if (!elem) {
-    elem = document.createElement('img');
-  }
-
-  if (elem.getAttribute('src') !== url) {
-    elem.setAttribute('src', url);
-    elem.setAttribute('alt', emoji);
-  }
-
-  return elem;
+    if (isEmoji(elem)) {
+        emoji(null, elem);
+    }
 }
 
 function getLink(token: Token): string {
-  if (token.type === TokenType.HashTag) {
-    return token.value;
-  }
+    if (token.type === TokenType.HashTag) {
+        return token.value;
+    }
 
-  if (token.type === TokenType.Link) {
-    return token.link;
-  }
+    if (token.type === TokenType.Link) {
+        return token.link;
+    }
 
-  return '';
+    return "";
 }
 
 /**
  * Возвращает класс для указанного токена
  */
 function getTokenTypeClass(token: Token): string {
-  if (isAutoLink(token) && token.format & TokenFormat.Monospace) {
-    return '';
-  }
-
-  if (isPrefixedToken(token) && token.value.length === 1) {
-    return '';
-  }
-
-  if (isRenderLink(token)) {
-    let { type } = token;
-    if (isCustomLink(token) && token.link[0] === '@') {
-      type = TokenType.Mention;
+    if (isAutoLink(token) && token.format & TokenFormat.Monospace) {
+        return "";
     }
 
-    return type !== TokenType.Link
-      ? `${tokenTypeClass.link} ${tokenTypeClass[type]}`
-      : tokenTypeClass[type];
-  }
+    if (isPrefixedToken(token) && token.value.length === 1) {
+        return "";
+    }
 
-  return tokenTypeClass[token.type];
+    if (isRenderLink(token)) {
+        let { type } = token;
+        if (isCustomLink(token) && token.link[0] === "@") {
+            type = TokenType.Mention;
+        }
+
+        return type !== TokenType.Link
+            ? `${tokenTypeClass.link} ${tokenTypeClass[type]}`
+            : tokenTypeClass[type];
+    }
+
+    return tokenTypeClass[token.type];
 }
 
 /**
@@ -481,30 +612,58 @@ function getTokenTypeClass(token: Token): string {
  * как ссылку
  */
 export function isRenderLink(token: Token): boolean {
-  if (token.format & TokenFormat.Monospace) {
-    // Внутри моноширинного текста разрешаем только «ручные» ссылки либо
-    // полные автоссылки (начинаются с протокола)
+    if (token.format & TokenFormat.Monospace) {
+        // Внутри моноширинного текста разрешаем только «ручные» ссылки либо
+        // полные автоссылки (начинаются с протокола)
+        return (
+            token.type === TokenType.Link &&
+            (!token.auto || /^[a-z+]+:\/\//i.test(token.value))
+        );
+    }
+
+    if (token.type === TokenType.Mention) {
+        return token.value.length > 1;
+    }
+
+    return token.type === TokenType.Link;
+}
+
+function isPrefixedToken(
+    token: Token
+): token is TokenMention | TokenCommand | TokenHashTag {
     return (
-      token.type === TokenType.Link &&
-      (!token.auto || /^[a-z+]+:\/\//i.test(token.value))
+        token.type === TokenType.Mention ||
+        token.type === TokenType.Command ||
+        token.type === TokenType.HashTag
     );
-  }
-
-  if (isPrefixedToken(token)) {
-    return token.value.length > 1;
-  }
-
-  return token.type === TokenType.Link;
-}
-
-function isPrefixedToken(token: Token): token is TokenMention | TokenHashTag {
-  return token.type === TokenType.Mention || token.type === TokenType.HashTag;
-}
-
-function isFurmulaToken(token: Token): token is TokenFormula {
-  return token.type === TokenType.Formula;
 }
 
 export function isPlainText(token: Token): token is TokenText {
-  return token.type === TokenType.Text && token.format === TokenFormat.None;
+    return token.type === TokenType.Text && token.format === TokenFormat.None;
+}
+
+function isFormulaToken(token: Token): token is TokenFormula {
+    return token.type === TokenType.Formula;
+}
+
+function onLinkEnter(evt: MouseEvent) {
+    dispatch(evt.target as Element, "linkenter");
+}
+
+function onLinkLeave(evt: MouseEvent) {
+    dispatch(evt.target as Element, "linkleave");
+}
+
+export function dispatch<T = unknown>(
+    elem: Element,
+    eventName: string,
+    detail?: T
+): void {
+    elem.dispatchEvent(
+        new CustomEvent<T>(eventName, {
+            bubbles: true,
+            cancelable: true,
+            detail,
+        })
+    );
 }

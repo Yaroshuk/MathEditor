@@ -1,8 +1,15 @@
-import type { Bracket, Emoji, Token, TokenText } from './types';
-import { TokenFormat, TokenType } from './types';
-import { isDelimiter, last, Codes, asciiToUpper } from './utils';
+import type {
+    Emoji,
+    Token,
+    TokenMarkdown,
+    TokenText,
+    ParserOptions,
+} from "./types";
+import { TokenType, TokenFormat } from "./types";
+import { isDelimiter, last, codePointAt, Codes } from "./utils";
 
 type MatchFn = (ch: number) => boolean;
+export type Bracket = "curly" | "square" | "round";
 
 export const enum Quote {
     None = 0,
@@ -11,14 +18,23 @@ export const enum Quote {
 }
 
 export default class ParserState {
+    /** Опции, с которыми парсим текст */
+    public options: ParserOptions;
+
     /** Текущая позиция парсера */
     public pos: number;
 
     /** Текстовая строка, которую нужно парсить */
     public string: string;
 
+    /** Текущий аккумулированный формат  */
+    public format: TokenFormat = 0;
+
     /** Список распаршенных токенов */
     public tokens: Token[] = [];
+
+    /** Стэк открытых токенов форматирования */
+    public formatStack: TokenMarkdown[] = [];
 
     /** Позиция начала накапливаемого текстового фрагмента */
     public textStart = -1;
@@ -34,7 +50,7 @@ export default class ParserState {
         round: 0,
         square: 0,
         curly: 0,
-    }
+    };
 
     public quote: Quote = 0;
 
@@ -42,23 +58,24 @@ export default class ParserState {
      * @param text Строка, которую нужно распарсить
      * @param pos Позиция, с которой нужно начинать парсинг
      */
-    constructor(str: string, pos = 0) {
+    constructor(str: string, options: ParserOptions, pos = 0) {
         this.string = str;
+        this.options = options;
         this.pos = pos;
     }
 
     /**
      * Возвращает *code point* текущего символа парсера без смещения указателя
      */
-    peek(): number | undefined {
-        return this.string.codePointAt(this.pos);
+    peek(): number {
+        return codePointAt(this.string, this.pos);
     }
 
     /**
      * Возвращает *code point* текущего символа парсера и смещает указатель
      */
     next(): number {
-        return this.hasNext() ? this.inc(this.peek()!) : NaN;
+        return this.hasNext() ? this.inc(this.peek()) : NaN;
     }
 
     /**
@@ -92,8 +109,8 @@ export default class ParserState {
      * Вернёт `true` если символ был поглощён
      */
     consume(match: number | MatchFn): boolean {
-        const ch = this.peek()!;
-        const ok = typeof match === 'function' ? match(ch) : ch === match;
+        const ch = this.peek();
+        const ok = typeof match === "function" ? match(ch) : ch === match;
 
         if (ok) {
             this.inc(ch);
@@ -109,26 +126,10 @@ export default class ParserState {
      */
     consumeWhile(match: number | MatchFn): boolean {
         const start = this.pos;
-        while (this.hasNext() && this.consume(match)) { /* */ }
-        return this.pos !== start;
-    }
-
-    /**
-     * Вернёт `true`, если все коды из `arr` были поглощены из текущей позиции потока
-     * @param ignoreCase Игнорировать регистр для латинских символов ASCII-последовательности
-     */
-    consumeArray(arr: number[], ignoreCase?: boolean): boolean {
-        const { pos } = this;
-        let ch: number;
-        for (let i = 0; i < arr.length; i++) {
-            ch = ignoreCase ? asciiToUpper(this.next()) : this.next();
-            if (arr[i] !== ch) {
-                this.pos = pos;
-                return false;
-            }
+        while (this.hasNext() && this.consume(match)) {
+            /* */
         }
-
-        return true;
+        return this.pos !== start;
     }
 
     /**
@@ -171,6 +172,27 @@ export default class ParserState {
     }
 
     /**
+     * Проверяет, есть ли указанный формат в текущем состоянии
+     */
+    hasFormat(format: TokenFormat): boolean {
+        return (this.format & format) === format;
+    }
+
+    /**
+     * Добавляет указанный тип форматирования в состояние
+     */
+    addFormat(format: TokenFormat): void {
+        this.format |= format;
+    }
+
+    /**
+     * Удаляет указанный тип форматирования из состояния
+     */
+    removeFormat(format: TokenFormat): void {
+        this.format ^= this.format & format;
+    }
+
+    /**
      * Поглощает текущий символ как накапливаемый текст
      */
     consumeText(): void {
@@ -193,10 +215,12 @@ export default class ParserState {
      */
     flushText(): void {
         if (this.hasPendingText()) {
+            // TODO использовать функцию-фабрику для сохранения шэйпа
             const token: TokenText = {
                 type: TokenType.Text,
-                format: TokenFormat.None,
+                format: this.options.useFormat ? this.format : TokenFormat.None,
                 value: this.substring(this.textStart, this.textEnd),
+                sticky: false,
             };
 
             if (this.emoji.length) {
@@ -218,7 +242,8 @@ export default class ParserState {
     atWordBound(): boolean {
         // Для указанной позиции нам нужно проверить, что предыдущий символ или токен
         // является границей слов
-        if (this.pos === 0 || this.isAfterEmoji()) {
+        const { pos } = this;
+        if (pos === 0 || this.isAfterEmoji()) {
             return true;
         }
 
@@ -227,7 +252,14 @@ export default class ParserState {
         }
 
         const lastToken = last(this.tokens);
-        return lastToken?.type === TokenType.Newline;
+        if (lastToken) {
+            return (
+                lastToken.type === TokenType.Markdown ||
+                lastToken.type === TokenType.Newline
+            );
+        }
+
+        return false;
     }
 
     /**
@@ -235,16 +267,22 @@ export default class ParserState {
      */
     isAfterEmoji(): boolean {
         if (this.hasPendingText()) {
-            if (this.emoji.length && last(this.emoji)!.to === (this.textEnd - this.textStart)) {
+            if (
+                this.emoji.length &&
+                last(this.emoji).to === this.textEnd - this.textStart
+            ) {
                 return true;
             }
         } else {
             const lastToken = last(this.tokens);
             if (lastToken) {
-                if (lastToken.type === TokenType.Text && lastToken.emoji?.length) {
+                if (
+                    lastToken.type === TokenType.Text &&
+                    lastToken.emoji?.length
+                ) {
                     // Если в конце текстовый токен, проверим, чтобы он закачивался
                     // на эмоджи
-                    const lastEmoji = last(lastToken.emoji)!;
+                    const lastEmoji = last(lastToken.emoji);
                     return lastEmoji.to === lastToken.value.length;
                 }
             }

@@ -1,5 +1,7 @@
 import { TokenType, TokenFormat } from '../parser';
 import type { Token, Emoji, TokenLink, TokenText } from '../parser';
+import { objectMerge } from '../utils/objectMerge';
+import type { EmojiUpdatePayload } from './types';
 
 export interface TokenForPos {
     /** Индекс найденного токена (будет -1, если такой токен не найден) */
@@ -33,15 +35,21 @@ export function tokenForPos(tokens: Token[], offset: number, locType: LocationTy
         }
 
         if (len === offset) {
-            // Попали точно на границу токенов
-            if (tokens.length - 1 === i || locType === 'end') {
-                // Это последний токен либо запросили конец диапазона
+            // Попали точно на границу токенов. Проверим, если следующий является
+            // sticky-токеном, то работать нужно будет с ним, иначе с текущим
+
+            if (tokens.length - 1 === i) {
+                // Это последний токен
+                return true;
+            }
+
+            const nextToken = tokens[i + 1]!;
+            if (!isSticky(nextToken) && locType === 'end') {
                 return true;
             }
         }
 
         offset -= len;
-        return false;
     });
 
     const pos: TokenForPos = { offset, index };
@@ -118,11 +126,10 @@ export function splitToken(token: Token, pos: number): [Token, Token] {
  */
 export function sliceToken(token: Token, start: number, end = token.value.length): Token {
     const { value, emoji } = token;
-    const result = {
-        ...token,
+    const result = objectMerge(token, {
         value: value.slice(start, end),
         emoji: sliceEmoji(emoji, start, end)
-    };
+    });
 
     if (result.type === TokenType.Link) {
         // Если достаём фрагмент автоссылки, то убираем это признак
@@ -161,9 +168,11 @@ export function sliceEmoji(emoji: Emoji[] | undefined, from: number, to: number)
  * для форматирования является не желательным
  */
 export function isSolidToken(token: Token): boolean {
-    return token.type === TokenType.HashTag
+    return token.type === TokenType.Command
+        || token.type === TokenType.HashTag
+        || token.type === TokenType.UserSticker
         || token.type === TokenType.Mention
-        || isAutoLink(token);
+        || (token.type === TokenType.Link && !isCustomLink(token))
 }
 
 /**
@@ -183,8 +192,7 @@ export function isAutoLink(token: Token): token is TokenLink {
 }
 
 function shiftEmoji(emoji: Emoji[], offset: number): Emoji[] {
-    return emoji.map(e => ({
-        ...e,
+    return emoji.map(e => objectMerge(e, {
         from: e.from + offset,
         to: e.to + offset
     }));
@@ -197,19 +205,27 @@ export function clamp(value: number, min: number, max: number): number {
 /**
  * Конвертирует указанный токен в текст
  */
-export function toText(token: Token): TokenText {
+export function toText(token: Token, sticky?: boolean): TokenText {
+    if (sticky === undefined) {
+        sticky = 'sticky' in token ? token.sticky : false;
+    }
     return {
         type: TokenType.Text,
         format: token.format,
         value: token.value,
         emoji: token.emoji,
+        sticky
     };
 }
 
 /**
  * Конвертирует указанный токен в ссылку
  */
-export function toLink(token: Token, link: string): TokenLink {
+export function toLink(token: Token, link: string, sticky?: boolean): TokenLink {
+    if (sticky === undefined) {
+        sticky = 'sticky' in token ? token.sticky : false;
+    }
+
     return {
         type: TokenType.Link,
         format: token.format,
@@ -217,12 +233,33 @@ export function toLink(token: Token, link: string): TokenLink {
         emoji: token.emoji,
         link,
         auto: false,
+        sticky,
     };
 }
 
 /**
  * Фабрика объекта-токена
  */
-export function createToken(text: string, format: TokenFormat = 0, emoji?: Emoji[]): Token {
-    return { type: TokenType.Text, format, value: text, emoji };
+export function createToken(text: string, format: TokenFormat = 0, sticky = false, emoji?: Emoji[]): Token {
+    return { type: TokenType.Text, format, value: text, emoji, sticky };
+}
+
+export function isSticky(token: Token): boolean {
+    return 'sticky' in token && token.sticky;
+}
+
+/**
+ * Создает EmojiUpdatePayload из массива emoji.
+ * @param text текст токена в котором находятся эмоджи
+ */
+export function createEmojiUpdatePayload(emojis: Emoji[], offset = 0, text?: string): EmojiUpdatePayload[] {
+    const sortedEmojis = emojis.slice().sort((a, b) => a.from - b.from);
+
+    return sortedEmojis.map((emoji) => {
+        const pos = offset + emoji.from;
+        const data = emoji.emojiData || null;
+        const hint = text && text.slice(emoji.from, emoji.to);
+
+        return { pos, data, hint };
+    });
 }

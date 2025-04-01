@@ -9,11 +9,13 @@
  */
 
 import ParserState, { getQuoteType } from './state';
-import { consumeTree, createTree } from './tree';
-import { Codes, isAlpha, isNumber, isUnicodeAlpha, isDelimiter, toCode, isBound, isWhitespace, isNewLine, isQuote } from './utils';
+import type { Bracket } from './state';
+import { consumeTree, createTree, type Tree } from './tree';
+import { Codes, consumeArray, isAlpha, isNumber, isUnicodeAlpha, isDelimiter, toCode, isBound, isWhitespace, isNewLine, isQuote } from './utils';
 import { keycap } from './emoji';
 import { TokenFormat, TokenType } from './types';
-import type { TokenLink, Bracket } from './types';
+import type { TokenLink } from './types';
+import { peekClosingMarkdown } from './markdown';
 import tld from '../data/tld';
 
 const enum FragmentMatch {
@@ -69,7 +71,7 @@ const loginChars = new Set(toCode(';?&=:'));
 /**
  * Спецсимволы, допустимые в локальной части email. По спеке там допустимы
  * произвольные значения в кавычках (например, "john doe"@gmail.com), но мы пока
- * такое не будем обрабатывать.
+ * такое нее будем обрабатывать.
  * Отличие от RFC:
  * – символы `-` и `_` относим к ASCII, а не printable
  * – исключаем `?`, '#' и `/` из набора, так как неправильно захватятся ссылки
@@ -91,10 +93,10 @@ const supportedProtocols = createTree([
 /**
  * Парсинг ссылок с текущей позиции парсера
  */
-export default function parseLink(state: ParserState): boolean {
-    if (state.atWordBound()) {
+export default function parseLink(state: ParserState, protocols = supportedProtocols): boolean {
+    if (state.options.link && state.atWordBound()) {
         const { pos } = state;
-        const handled = magnet(state) || strictEmail(state) || strictAddress(state) || emailOrAddress(state);
+        const handled = magnet(state) || strictEmail(state) || strictAddress(state, protocols) || emailOrAddress(state);
 
         if (handled === ConsumeResult.No) {
             // Не смогли ничего внятного поглотить, сбросим позицию
@@ -120,7 +122,7 @@ export default function parseLink(state: ParserState): boolean {
  */
 function strictEmail(state: ParserState): ConsumeResult {
     const { pos } = state;
-    if (state.consumeArray(mailtoChars, true)) {
+    if (consumeArray(state, mailtoChars, true)) {
         // Если поглотили протокол, то независимо от работы `email()`
         // вернём `true`, тем самым сохраним `mailto:` в качестве обычного текста,
         // если за ним не следует нормальный e-mail.
@@ -132,11 +134,11 @@ function strictEmail(state: ParserState): ConsumeResult {
     return ConsumeResult.No;
 }
 
-function strictAddress(state: ParserState): ConsumeResult {
+function strictAddress(state: ParserState, protocols: Tree): ConsumeResult {
     let { pos } = state;
     const start = pos;
 
-    if (consumeTree(state, supportedProtocols, true)) {
+    if (consumeTree(state, protocols, true)) {
         // Нашли протокол, далее поглощаем доменную часть.
         // При наличии протокола правила для доменной части будут упрощённые:
         // нам не нужно валидировать результат через `isDomain()`, достаточно
@@ -202,7 +204,7 @@ function emailOrAddress(state: ParserState): ConsumeResult {
 
 function magnet(state: ParserState): ConsumeResult {
     const { pos } = state;
-    if (state.consumeArray(magnetChars, true)) {
+    if (consumeArray(state, magnetChars, true)) {
         consumeQueryString(state);
         const value = state.substring(pos);
         state.push(linkToken(value, value));
@@ -273,8 +275,9 @@ function fragment(state: ParserState, mask = 0xffffffff): FragmentMatch {
     while (state.hasNext()) {
         pos = state.pos;
 
-        if (keycap(state)) {
-            // Нарвались на keycap-эмоджи, прекращаем парсинг
+        if (keycap(state) || peekClosingMarkdown(state)) {
+            // Нарвались на keycap-эмоджи или на закрывающий MD-синтаксис,
+            // прекращаем парсинг
             state.pos = pos;
             break;
         }
@@ -440,7 +443,7 @@ function segment(state: ParserState): boolean {
 
     while (state.hasNext()) {
         pos = state.pos;
-        ch = state.peek()!;
+        ch = state.peek();
 
         // Отдельно обрабатываем кавычки: если они есть в предыдущем тексте,
         // то не делаем их частью ссылки
@@ -506,7 +509,7 @@ function hex(state: ParserState): boolean {
 function unreserved(state: ParserState): boolean {
     // Отдельно обрабатываем кавычки: если они есть в предыдущем тексте,
     // то, не делаем их частью ссылки
-    if (shouldSkipQuote(state, state.peek()!)) {
+    if (shouldSkipQuote(state, state.peek())) {
         return false;
     }
 
@@ -537,7 +540,7 @@ function excludes(result: FragmentMatch, test: FragmentMatch): boolean {
 }
 
 function atWordEdge(state: ParserState): boolean {
-    const ch = state.peek()!;
+    const ch = state.peek();
     return isBound(ch) || isPunct(ch);
 }
 
@@ -590,7 +593,7 @@ function isPunct(ch: number): boolean {
 }
 
 function handleBracket(state: ParserState): ConsumeResult {
-    const ch = state.peek()!;
+    const ch = state.peek();
     const bracketType = getBracket(ch);
     if (bracketType) {
         const { pos } = state;
@@ -628,8 +631,6 @@ function getBracket(ch: number): Bracket | undefined {
         case Codes.SquareBracketClose:
             return 'square';
     }
-
-    return;
 }
 
 function isOpenBracket(ch: number): boolean {
@@ -649,5 +650,6 @@ function linkToken(value: string, link: string): TokenLink {
         value,
         link,
         auto: true,
+        sticky: false
     };
 }

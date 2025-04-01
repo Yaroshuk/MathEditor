@@ -1,4 +1,4 @@
-export const keyModifier: Record<string, number> = {
+export const keyModifier = {
     ctrl: 1 << 0,
     alt: 1 << 1,
     shift: 1 << 2,

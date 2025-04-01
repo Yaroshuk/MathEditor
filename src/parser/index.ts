@@ -1,38 +1,65 @@
 import ParserState from './state';
-import type { Token } from './types';
+import { TokenType, TokenFormat } from './types';
+import type { ParserOptions, Token } from './types';
 import emoji from './emoji';
 import textEmoji from './text-emoji';
+import userSticker from './user-sticker';
 import mention from './mention';
+import command from './command';
 import hashtag from './hashtag';
 import link from './link';
+import markdown from './markdown';
 import newline from './newline';
 import formula from './formula';
+import { normalize, defaultOptions } from './utils';
+import { objectMerge } from '../utils/objectMerge';
+import { createTree, type Tree } from './tree';
 
-export default function parse(text: string): Token[] {
-  const state = new ParserState(text);
+export default function parse(text: string, opt?: Partial<ParserOptions>): Token[] {
+    const options: ParserOptions = objectMerge(defaultOptions, opt);
+    const state = new ParserState(text, options);
+    
+    const { linkProtocols } = options;
 
-  while (state.hasNext()) {
-    newline(state) ||
-      emoji(state) ||
-      textEmoji(state) ||
-      mention(state) ||
-      hashtag(state) ||
-      link(state) ||
-      formula(state) ||
-      state.consumeText();
-  }
+    let protocols: Tree | undefined;
+    if (linkProtocols) {
+        protocols = Array.isArray(linkProtocols)
+            ? createTree(linkProtocols, true)
+            : linkProtocols;
+    }
 
-  state.flushText();
-  return state.tokens;
+    while (state.hasNext()) {
+        formula(state) || markdown(state) || newline(state)
+            || emoji(state) || textEmoji(state) || userSticker(state)
+            || mention(state) || command(state) || hashtag(state)
+            || link(state, protocols)
+            || state.consumeText();
+    }
+
+    state.flushText();
+
+    let { tokens } = state;
+
+    if (options.markdown && state.formatStack.length) {
+        // Если есть незакрытые токены форматирования, сбрасываем их формат,
+        // так как они не валидны
+        for (let i = 0, token: Token; i < state.formatStack.length; i++) {
+            token = state.formatStack[i] as Token;
+            token.format = TokenFormat.None;
+            token.type = TokenType.Text;
+        }
+
+        tokens = normalize(tokens);
+    }
+
+    return tokens;
 }
 
-export { normalize, getText, getLength } from './utils';
-export { TokenType, TokenFormat } from './types';
+export { normalize, getText, getLength, codePointAt } from './utils';
+
 export type {
-  Emoji,
-  Token,
-  TokenHashTag,
-  TokenLink,
-  TokenMention,
-  TokenText,
+    ParserOptions, Emoji,
+    Token, TokenCommand, TokenHashTag, TokenLink, TokenMarkdown, TokenMention, TokenText, TokenUserSticker
 } from './types';
+
+export { TokenType, TokenFormat } from './types';

@@ -1,4 +1,4 @@
-const aliases: Record<string, string> = {
+export default {
     ':C': '☹️',
     ':c': '☹️',
     ':)': '🙂',
@@ -87,6 +87,7 @@ const aliases: Record<string, string> = {
     '*-)': '😐',
     ':-I': '😠',
     ':I': '😠',
+    ':@': '😠',
     '8oI': '😡',
     '8o|': '😡',
     '|-)': '😪',
@@ -129,7 +130,7 @@ const aliases: Record<string, string> = {
     '(Z)': '👦',
     '(X)': '👧',
     '(S)': '🌙',
-    '(facepalm)': '🤦‍'
+    '(facepalm)': '🤦‍',
+    '^o)': '🤨',
+    ':S': '😵‍💫'
 };
-
-export default aliases;

@@ -1,6 +1,6 @@
 import type { TextRange } from './types';
-import { getRawValue, isElement, isText } from './utils';
-import { clamp } from '../formatting/utils';
+import { createWalker, getRawValue, isElement, isText } from './utils';
+import { clamp } from '../formatted-string/utils';
 
 interface RangeBound {
     container: Node;
@@ -11,9 +11,9 @@ interface RangeBound {
  * Возвращает текущий допустимый диапазон, который находится в указанном
  * контейнере
  */
-export function getRange(root: HTMLElement): Range | void {
+export function getRange(root: HTMLElement): Range {
     const sel = window.getSelection();
-    const range = sel?.rangeCount && sel.getRangeAt(0);
+    const range = sel.rangeCount && sel.getRangeAt(0);
     if (range && isValidRange(range, root)) {
         return range;
     }
@@ -22,7 +22,7 @@ export function getRange(root: HTMLElement): Range | void {
 /**
  * Создаёт выделенный диапазон по указанным координатам
  */
-export function setRange(root: HTMLElement, from: number, to?: number): Range | void {
+export function setRange(root: HTMLElement, from: number, to?: number): Range | undefined {
     const range = locationToRange(root, from, to);
     if (range) {
         return setDOMRange(range);
@@ -32,8 +32,8 @@ export function setRange(root: HTMLElement, from: number, to?: number): Range | 
 /**
  * Обновляет DOM-диапазон, если он отличается от текущего
  */
-export function setDOMRange(range: Range): Range | void {
-    const sel = window.getSelection()!;
+export function setDOMRange(range: Range): Range | undefined {
+    const sel = window.getSelection();
 
     // Если уже есть выделение, сравним указанный диапазон с текущим:
     // если они равны, то ничего не делаем, чтобы лишний раз не напрягать
@@ -47,10 +47,10 @@ export function setDOMRange(range: Range): Range | void {
                 return;
             }
         }
-    } catch {
+    } catch (err) {
         // Может быть ошибка, если элемент ещё не в DOM-дереве: игнорируем её
     }
-    sel.empty();
+    sel.removeAllRanges();
     sel.addRange(range);
     return range;
 }
@@ -63,7 +63,6 @@ export function getTextRange(root: HTMLElement): TextRange | undefined {
     if (range) {
         return rangeToLocation(root, range);
     }
-    return;
 }
 
 /**
@@ -82,7 +81,7 @@ export function rangeToLocation(root: HTMLElement, range: Range): TextRange {
 /**
  * Десериализация диапазона из координат модели в DOM
  */
-export function locationToRange(ctx: HTMLElement, from: number, to?: number): Range | void {
+export function locationToRange(ctx: HTMLElement, from: number, to?: number): Range {
     const start = locationToRangeBound(ctx, from);
     const end = to == null || to === from ? start : locationToRangeBound(ctx, to);
 
@@ -140,9 +139,9 @@ export function rangeBoundToLocation(root: HTMLElement, bound: Node, pos: number
 }
 
 function sumNodesLength(root: HTMLElement, bound: Node, pos: number): number {
-    const walker = createWalker(root);
     let result = 0;
-    let n: Node | null;
+    const walker = createWalker(root);
+    let n: Node;
     while ((n = walker.nextNode()) && n !== bound) {
         result += getNodeLength(n, false);
     }
@@ -175,7 +174,7 @@ export function locationToRangeBound(root: HTMLElement, pos: number): RangeBound
         // Обходим содержимое строки
         const walker = createWalker(line);
         let len: number
-        let container: Node | null;
+        let container: Node;
 
         while (container = walker.nextNode()) {
             len = getNodeLength(container, false);
@@ -198,12 +197,12 @@ export function locationToRangeBound(root: HTMLElement, pos: number): RangeBound
                 // Учитываем захват элемента в зависимости того, попадает ли позиция
                 // внутрь токена (pos > 0) или нет
                 let offset = pos === 0 ? 0 : 1;
-                let node: Node | null = container;
+                let node = container;
                 while (node = node.previousSibling) {
                     offset++;
                 }
 
-                return { container: container.parentNode!, offset };
+                return { container: container.parentNode, offset };
             }
 
             pos -= len;
@@ -235,7 +234,7 @@ function getLineLength(line: Element): number {
  */
 function getNodeLength(node: Node, deep = false): number {
     if (isText(node)) {
-        return node.nodeValue ? node.nodeValue.length : 0;
+        return node.nodeValue.length;
     }
 
     let result = 0;
@@ -280,8 +279,4 @@ function isValidLineMarkup(container: HTMLElement): boolean {
     }
 
     return false;
-}
-
-function createWalker(elem: HTMLElement): TreeWalker {
-    return elem.ownerDocument.createTreeWalker(elem, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT)
 }

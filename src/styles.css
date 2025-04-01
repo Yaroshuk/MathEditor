@@ -1,0 +1,23 @@
+#text-editor {
+  min-height: 300px;
+  border: 1px solid red;
+}
+
+#text-editor-scroller {
+  min-height: 300px;
+}
+
+math-field {
+  min-width: 100px;
+  height: 100px;
+}
+
+/* Hide the virtual keyboard toggle */
+math-field::part(virtual-keyboard-toggle) {
+  display: none;
+}
+
+/* Hide the menu toggle */
+math-field::part(menu-toggle) {
+  display: none;
+}

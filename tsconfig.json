@@ -1,20 +1,18 @@
 {
   "compilerOptions": {
-    "target": "ESNext",
-    "useDefineForClassFields": true,
+    "target": "ES2015",
     "module": "ESNext",
-    "lib": ["ESNext", "DOM"],
+    "lib": ["ES2016", "DOM", "DOM.Iterable"],
+    "verbatimModuleSyntax": true,
     "isolatedModules": true,
-    "importsNotUsedAsValues": "error",
-    "moduleResolution": "Node",
-    "strict": true,
-    "sourceMap": true,
+    "moduleResolution": "node",
+    "allowJs": true,
+    "outDir": "./dist",
     "resolveJsonModule": true,
     "esModuleInterop": true,
-    "noEmit": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noImplicitReturns": true
+    "noImplicitThis": true,
+    "sourceMap": true,
+    "declaration": true
   },
-  "include": ["src", "refs"]
+  "include": ["src"]
 }

@@ -1,17 +1,21 @@
 import { TokenFormat, TokenType } from './types';
 import type ParserState from './state';
-import { Codes, isNumber, isUnicodeAlpha, last } from './utils';
+import { Codes, isBound, isCommandName, last } from './utils';
 
 export default function parseHashtag(state: ParserState): boolean {
-    if (atHashtagBound(state)) {
+    if (state.options.hashtag && atHashtagBound(state)) {
         const { pos } = state;
-        if (state.consume(Codes.Hash) && state.consumeWhile(isHashtagName)) {
-            state.push({
-                type: TokenType.HashTag,
-                format: TokenFormat.None,
-                value: state.substring(pos),
-            });
-            return true;
+        if (state.consume(Codes.Hash)) {
+            if (state.consumeWhile(isCommandName) || isBound(state.peek())) {
+                const value = state.substring(pos);
+                state.push({
+                    type: TokenType.HashTag,
+                    format: TokenFormat.None,
+                    value,
+                    hashtag: value.slice(1)
+                });
+                return true;
+            }
         }
 
         state.pos = pos;
@@ -30,12 +34,9 @@ function atHashtagBound(state: ParserState): boolean {
     }
 
     if (!state.hasPendingText()) {
-        return last(state.tokens)?.type === TokenType.HashTag;
+        const lastToken = last(state.tokens);
+        return lastToken?.type === TokenType.HashTag;
     }
 
     return false;
-}
-
-function isHashtagName(ch: number): boolean {
-    return ch === Codes.Underscore || isNumber(ch) || isUnicodeAlpha(ch);
 }

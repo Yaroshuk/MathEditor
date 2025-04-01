@@ -9,7 +9,6 @@ const enum EmojiCodes {
     /** EMOJI MODIFIER FITZPATRICK TYPE-6 */
     SkinModifierTo = 0x1f3ff,
     Presentation = 0xfe0f,
-    EnclosingKeycap = 0x20e3,
 
     // Модифицирующие последовательности
     TagSeqStart = 0xe0020,
@@ -19,16 +18,16 @@ const enum EmojiCodes {
 
 /**
  * Набор одиночных эмоджи в диапазоне от 0x2000 до 0x3300.
- * Генерируется из официальной Unicode-спецификации
+ * Генерируется из тест-задачи Generate Low Emoji в test/emoji.js
  */
-const emojiLow = new Set([0x203c, 0x2049, 0x2122, 0x2139, 0x2328, 0x23cf, 0x24c2, 0x25b6, 0x25c0, 0x260e, 0x2611, 0x2618, 0x261d, 0x2620, 0x2626, 0x262a, 0x2640, 0x2642, 0x2663, 0x2668, 0x267b, 0x2699, 0x26a7, 0x26c8, 0x26d1, 0x26fd, 0x2702, 0x2705, 0x270f, 0x2712, 0x2714, 0x2716, 0x271d, 0x2721, 0x2728, 0x2744, 0x2747, 0x274c, 0x274e, 0x2757, 0x27a1, 0x27b0, 0x27bf, 0x2b50, 0x2b55, 0x3030, 0x303d, 0x3297, 0x3299]);
+const emojiLow = new Set([0x203c, 0x2049, 0x2139, 0x2328, 0x23cf, 0x24c2, 0x25b6, 0x25c0, 0x260e, 0x2611, 0x2618, 0x261d, 0x2620, 0x2626, 0x262a, 0x2640, 0x2642, 0x2663, 0x2668, 0x267b, 0x2699, 0x26a7, 0x26c8, 0x26d1, 0x26fd, 0x2702, 0x2705, 0x270f, 0x2712, 0x2714, 0x2716, 0x271d, 0x2721, 0x2728, 0x2744, 0x2747, 0x274c, 0x274e, 0x2757, 0x27a1, 0x27b0, 0x27bf, 0x2b50, 0x2b55, 0x3030, 0x303d, 0x3297, 0x3299]);
 
 /**
  * Вернёт `true`, если удалось прочитать эмоджи из текущей позиции потока
  */
 export default function parseEmoji(state: ParserState): boolean {
     const { pos } = state;
-    if (consumeEmoji(state)) {
+    if (!state.options.skipEmoji && consumeEmoji(state)) {
         state.pushEmoji(pos, state.pos);
         return true;
     }
@@ -38,6 +37,7 @@ export default function parseEmoji(state: ParserState): boolean {
 
 /**
  * Вспомогательный консьюмер для всех эмоджи
+ * @param state
  */
 export function consumeEmoji(state: ParserState): boolean {
     return keycap(state) || flag(state) || emoji(state) || forcedEmoji(state);
@@ -52,9 +52,9 @@ export function consumeEmoji(state: ParserState): boolean {
 export function keycap(state: ParserState): boolean {
     const { pos } = state;
     if (state.consume(isKeycapStart)) {
-        // Этого символа может не быть (non-qualified emoji)
+        // Этого символа может не быть
         state.consume(EmojiCodes.Presentation);
-        if (state.consume(EmojiCodes.EnclosingKeycap)) {
+        if (state.consume(0x20e3)) {
             return true;
         }
     }
@@ -116,13 +116,13 @@ function emoji(state: ParserState): boolean {
  * Форсировванный эмоджи: ASCII-символ + указание на представление в виде эмоджи
  */
 function forcedEmoji(state: ParserState) {
-    const { pos } = state;
+    const start = state.pos;
 
     if (state.next() && state.consume(EmojiCodes.Presentation)) {
         return true;
     }
 
-    state.pos = pos;
+    state.pos = start;
     return false;
 }
 
@@ -130,7 +130,7 @@ function forcedEmoji(state: ParserState) {
  * Поглощает самостоятельный символ эмоджи в потоке
  */
 function consumeEmojiItem(state: ParserState): boolean {
-    const { pos } = state;
+    const pos = state.pos;
 
     if (state.consume(isEmoji)) {
         // Полноценный эмоджи: может быть либо самостоятельным, либо
@@ -175,9 +175,11 @@ function isGenderFlag(cp: number): boolean {
 }
 
 function isEmoji(cp: number): boolean {
-    return cp === 0x00a9
-        || cp === 0x00ae
+    return cp === 0x00ae
 
+        // || (cp >= 0x2000 && cp <= 0x3300)
+        // Набор одиночных эмоджи в диапазоне от 0x2000 до 0x3300.
+        // Генерируется из тест - задачи Generate Low Emoji в test/emoji.js
         || emojiLow.has(cp)
         || (cp >= 0x2194 && cp <= 0x2199)
         || (cp >= 0x21a9 && cp <= 0x21aa)
