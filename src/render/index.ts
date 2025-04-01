@@ -264,13 +264,26 @@ class ReconcileState {
   mathfield(): HTMLElement {
     let node = this.container.childNodes[this.pos] as HTMLElement;
 
+    // const bomSpan = document.createElement('span');
+    // bomSpan.className = 'bom-character';
+
+    // // Вставляем BOM символ внутрь span
+    // bomSpan.innerHTML = '&#xfeff;';
+
+    // const bomSpan2 = document.createElement('span');
+    // bomSpan.className = 'bom-character';
+
+    // // Вставляем BOM символ внутрь span
+    // bomSpan2.innerHTML = '&#xfeff;';
+
     if (!isElement(node) || node.localName !== 'mathfield') {
       const node = document.createElement('button');
 
       //node.body.appendChild(bomNode);
       node.contentEditable = 'false';
-      node.style.userSelect = 'none';
+      node.style.userSelect = 'all';
       node.style.display = 'inline-block';
+      //node.style.position = 'relative';
 
       const mathinput = new MathfieldElement();
 
@@ -278,9 +291,10 @@ class ReconcileState {
       // mathinput.focus();
       //mathinput.innerHTML = '&#xfeff;';
       mathinput.value = '\\frac{\\pi}{2}';
-      node.contentEditable = 'false';
-      node.style.userSelect = 'none';
-      node.style.display = 'inline-block';
+      //mathinput.contentEditable = 'false';
+      //mathinput.style.userSelect = 'none';
+      // mathinput.style.display = 'inline-block';
+      // mathinput.style.position = 'relative';
 
       // node.innerHTML += '&#xfeff;';
       node.setAttribute('data-raw', ' ');

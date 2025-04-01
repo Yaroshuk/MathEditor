@@ -8,7 +8,7 @@ import {
   slice,
 } from '../formatting';
 import type { TokenFormatUpdate } from '../formatting';
-import { isCustomLink, tokenForPos } from '../formatting/utils';
+import { isCustomLink, tokenForPos, tokenRange } from '../formatting/utils';
 import type { TextRange, Model } from './types';
 
 const skipInputTypes = new Set([
@@ -109,6 +109,9 @@ export function updateFromInputEvent(
   }
 
   if (evt.inputType.startsWith('delete')) {
+    console.log('removeText', evt.inputType, model, range);
+    const [start, end] = tokenRange(model, from, to);
+    console.log('removeText', start, end);
     return removeText(model, from, to - from);
   }
 

@@ -3,7 +3,13 @@ import type { Token } from '../parser';
 import render, { isEmoji } from '../render';
 import type { TextRange, Model } from './types';
 import History, { HistoryEntry } from './history';
-import { getTextRange, rangeToLocation, setDOMRange, setRange } from './range';
+import {
+  getTextRange,
+  locationToRangeBound,
+  rangeToLocation,
+  setDOMRange,
+  setRange,
+} from './range';
 import {
   getInputEventText,
   getText,
@@ -91,7 +97,66 @@ export default class Editor {
     this.history.push(this.model, 'init', this.caret);
   }
 
+  private formulaKeyNavigation = (evt: KeyboardEvent) => {
+    const target = evt.target as HTMLElement;
+    const editor = evt.currentTarget as HTMLElement;
+
+    const elem = target.querySelector('math-field') as HTMLElement;
+
+    const selection = window.getSelection();
+    const range = document.createRange();
+
+    if (!editor) return;
+
+    // if (evt.getTargetRanges) {
+    //   const ranges = evt.getTargetRanges();
+    //   if (ranges.length) {
+    //     this.startRange = rangeToLocation(
+    //       this.element,
+    //       evt.getTargetRanges()[0] as Range
+    //     );
+    //   }
+    // }
+
+    // const treeWalker = document.createTreeWalker(
+    //   editor,
+    //   NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+    //   null
+    // );
+
+    // const nodes = [];
+    // let currentNode;
+    // while ((currentNode = treeWalker.nextNode())) {
+    //   if ((currentNode as HTMLElement).tagName !== 'MATH-FIELD') {
+    //     nodes.push(currentNode);
+    //   }
+    // }
+    if (evt.key === 'ArrowLeft') {
+      range.setStartBefore(target);
+      range.setEndAfter(target);
+      setDOMRange(range);
+      //range.collapse(false);
+    } else if (evt.key === 'ArrowRight') {
+      //range.setStartAfter(target);
+      range.setStartBefore(target);
+      range.setEndAfter(target);
+      setDOMRange(range);
+
+      // range.setStart(target, 4);
+      // range.setEnd(target, 4);
+    }
+
+    //setDOMRange(range);
+  };
+
   private onKeyDown = (evt: KeyboardEvent) => {
+    const target = evt.target as HTMLElement;
+    console.log('keydown', evt.key, target.dataset, target.nodeName);
+
+    if (target.dataset.type === 'formula') {
+      this.formulaKeyNavigation(evt);
+    }
+
     if (evt.target.nodeName === 'MATH-FIELD') {
       evt.stopPropagation();
       return;
@@ -136,6 +201,8 @@ export default class Editor {
           evt.getTargetRanges()[0] as Range
         );
       }
+
+      console.log('ranges', ranges, this.startRange);
     }
 
     if (!this.startRange) {
@@ -164,6 +231,7 @@ export default class Editor {
   };
 
   private onInput = (evt: InputEvent) => {
+    console.log('111')
     if (evt.target.nodeName === 'MATH-FIELD') {
       evt.stopPropagation();
       //this.element.blur();
@@ -211,6 +279,7 @@ export default class Editor {
       const rect = elem.getBoundingClientRect();
       const center = rect.left + rect.width * 0.6;
       const range = document.createRange();
+
       if (evt.clientX < center) {
         range.setStartBefore(elem);
         range.setEndBefore(elem);
@@ -218,6 +287,8 @@ export default class Editor {
         range.setStartAfter(elem);
         range.setEndAfter(elem);
       }
+
+      console.log(range);
 
       setDOMRange(range);
     }
