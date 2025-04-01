@@ -13,12 +13,14 @@ export default function parseFormula(state: ParserState): boolean {
             state.push({
                 type: TokenType.Formula,
                 format: TokenFormat.None,
-                value: "$",
+                value: `<${Math.random().toString().substring(2, 5)}>`,
+                id: "123",
             });
             return true;
         }
+
+        state.pos = pos;
     }
-    //state.pos = pos;
     // }
 
     return false;

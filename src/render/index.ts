@@ -386,7 +386,7 @@ class ReconcileState {
         return node as HTMLElement;
     }
 
-    mathfield(): HTMLElement {
+    mathfield(token: TokenFormula): HTMLElement {
         let node = this.container.childNodes[this.pos] as HTMLElement;
         console.log("NODE", node);
 
@@ -398,6 +398,7 @@ class ReconcileState {
             node.contentEditable = "false";
             node.style.userSelect = "all";
             node.style.display = "inline-block";
+            node.id = token.id
             //node.style.position = 'relative';
 
             const mathinput = new MathfieldElement();
@@ -405,14 +406,14 @@ class ReconcileState {
             // mathinput.autofocus = true;
             // mathinput.focus();
             //mathinput.innerHTML = '&#xfeff;';
-            mathinput.value = Math.random().toString();
-            // mathinput.contentEditable = "false";
-            // mathinput.style.userSelect = "none";
-            // mathinput.style.display = "inline-block";
+            mathinput.value = token.value;
+            mathinput.contentEditable = "false";
+            mathinput.style.userSelect = "none";
+            mathinput.style.display = "inline-block";
             // mathinput.style.position = 'relative';
 
             // node.innerHTML += '&#xfeff;';
-            node.setAttribute("data-raw", "$");
+            node.setAttribute("data-raw", token.value);
             node.setAttribute("data-type", "formula");
             node.oninput = () => {
                 console.log("INPUT");
@@ -525,7 +526,7 @@ function renderTokenContainer(
     } else if (token.type === TokenType.UserSticker && state.options.emoji) {
         elem = state.emoji(token.value, token.value) as HTMLElement;
     } else if (isFormulaToken(token)) {
-        elem = state.mathfield();
+        elem = state.mathfield(token);
     } else {
         elem = state.elem("span");
     }

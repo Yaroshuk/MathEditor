@@ -212,6 +212,16 @@ export function consumeIdentifier(state: ParserState): boolean {
     return false;
 }
 
+export function consumeNumbers(state: ParserState): boolean {
+  // Идентификатор обязательно должен начинаться с латинского символа
+  if (state.consume(isNumber)) {
+      state.consumeWhile(isNumber);
+      return true;
+  }
+
+  return false;
+}
+
 /**
  * Вернёт `true`, если все коды из `arr` были поглощены из текущей позиции потока
  */

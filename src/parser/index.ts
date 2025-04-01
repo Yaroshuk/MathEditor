@@ -1,24 +1,30 @@
-import ParserState from './state';
-import { TokenType, TokenFormat } from './types';
-import type { ParserOptions, Token } from './types';
-import emoji from './emoji';
-import textEmoji from './text-emoji';
-import userSticker from './user-sticker';
-import mention from './mention';
-import command from './command';
-import hashtag from './hashtag';
-import link from './link';
-import markdown from './markdown';
-import newline from './newline';
-import formula from './formula';
-import { normalize, defaultOptions } from './utils';
-import { objectMerge } from '../utils/objectMerge';
-import { createTree, type Tree } from './tree';
+import ParserState from "./state";
+import { TokenType, TokenFormat } from "./types";
+import type { ParserOptions, Token } from "./types";
+import emoji from "./emoji";
+import textEmoji from "./text-emoji";
+import userSticker from "./user-sticker";
+import mention from "./mention";
+import command from "./command";
+import hashtag from "./hashtag";
+import link from "./link";
+import markdown from "./markdown";
+import newline from "./newline";
+import formula from "./formula";
+import formulaReader from "./formula-reader";
+import { normalize, defaultOptions } from "./utils";
+import { objectMerge } from "../utils/objectMerge";
+import { createTree, type Tree } from "./tree";
 
-export default function parse(text: string, opt?: Partial<ParserOptions>): Token[] {
+export default function parse(
+    text: string,
+    opt?: Partial<ParserOptions>
+): Token[] {
+    //text = text.replace("$", `<${Math.random().toString().substring(2, 5)}>`);
+
     const options: ParserOptions = objectMerge(defaultOptions, opt);
     const state = new ParserState(text, options);
-    
+
     const { linkProtocols } = options;
 
     let protocols: Tree | undefined;
@@ -29,11 +35,18 @@ export default function parse(text: string, opt?: Partial<ParserOptions>): Token
     }
 
     while (state.hasNext()) {
-        formula(state) || markdown(state) || newline(state)
-            || emoji(state) || textEmoji(state) || userSticker(state)
-            || mention(state) || command(state) || hashtag(state)
-            || link(state, protocols)
-            || state.consumeText();
+        formula(state) ||
+            formulaReader(state) ||
+            markdown(state) ||
+            newline(state) ||
+            emoji(state) ||
+            textEmoji(state) ||
+            userSticker(state) ||
+            mention(state) ||
+            command(state) ||
+            hashtag(state) ||
+            link(state, protocols) ||
+            state.consumeText();
     }
 
     state.flushText();
@@ -55,11 +68,19 @@ export default function parse(text: string, opt?: Partial<ParserOptions>): Token
     return tokens;
 }
 
-export { normalize, getText, getLength, codePointAt } from './utils';
+export { normalize, getText, getLength, codePointAt } from "./utils";
 
 export type {
-    ParserOptions, Emoji,
-    Token, TokenCommand, TokenHashTag, TokenLink, TokenMarkdown, TokenMention, TokenText, TokenUserSticker
-} from './types';
+    ParserOptions,
+    Emoji,
+    Token,
+    TokenCommand,
+    TokenHashTag,
+    TokenLink,
+    TokenMarkdown,
+    TokenMention,
+    TokenText,
+    TokenUserSticker,
+} from "./types";
 
-export { TokenType, TokenFormat } from './types';
+export { TokenType, TokenFormat } from "./types";

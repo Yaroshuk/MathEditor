@@ -185,6 +185,7 @@ export interface TokenNewline extends TokenBase {
 
 export interface TokenFormula extends TokenBase {
     type: TokenType.Formula;
+    id: string
 }
 
 export interface EmojiData {
