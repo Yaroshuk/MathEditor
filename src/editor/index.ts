@@ -96,6 +96,7 @@ export default class Editor {
       evt.stopPropagation();
       return;
     }
+
     if (!evt.defaultPrevented) {
       this.shortcuts.handle(evt);
     }
@@ -122,9 +123,9 @@ export default class Editor {
       return;
     }
 
-    if (evt.data === '$') {
-      this.blur();
-    }
+    // if (evt.data === '$') {
+    //   this.blur();
+    // }
 
     this.startRange = null;
     if (evt.getTargetRanges) {
@@ -165,7 +166,7 @@ export default class Editor {
   private onInput = (evt: InputEvent) => {
     if (evt.target.nodeName === 'MATH-FIELD') {
       evt.stopPropagation();
-      this.element.blur();
+      //this.element.blur();
       return;
     }
 
@@ -183,8 +184,9 @@ export default class Editor {
       // Обычное изменение, сразу применяем результат к UI
       const range = getTextRange(this.element)!;
       if (evt.data === '$') {
-        this.blur();
+        //this.blur();
         this.updateModel(nextModel, getDiffTypeFromEvent(evt), range);
+        this.setSelection(range[0], range[1]);
       } else {
         this.updateModel(nextModel, getDiffTypeFromEvent(evt), range);
         this.setSelection(range[0], range[1]);

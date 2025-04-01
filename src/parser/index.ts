@@ -13,12 +13,12 @@ export default function parse(text: string): Token[] {
 
   while (state.hasNext()) {
     newline(state) ||
+      formula(state) ||
       emoji(state) ||
       textEmoji(state) ||
       mention(state) ||
       hashtag(state) ||
       link(state) ||
-      formula(state) ||
       state.consumeText();
   }
 

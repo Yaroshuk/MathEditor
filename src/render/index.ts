@@ -265,17 +265,39 @@ class ReconcileState {
     let node = this.container.childNodes[this.pos] as HTMLElement;
 
     if (!isElement(node) || node.localName !== 'mathfield') {
-      //const span = document.createElement('span');
+      const node = document.createElement('button');
 
-      node = new MathfieldElement();
+      //node.body.appendChild(bomNode);
+      node.contentEditable = 'false';
+      node.style.userSelect = 'none';
+      node.style.display = 'inline-block';
 
-      node.autofocus = true;
-      node.focus();
-      node.value = '\\frac{\\pi}{2}';
+      const mathinput = new MathfieldElement();
+
+      // mathinput.autofocus = true;
+      // mathinput.focus();
+      //mathinput.innerHTML = '&#xfeff;';
+      mathinput.value = '\\frac{\\pi}{2}';
+      node.contentEditable = 'false';
+      node.style.userSelect = 'none';
+      node.style.display = 'inline-block';
+
+      // node.innerHTML += '&#xfeff;';
       node.setAttribute('data-raw', ' ');
+      node.setAttribute('data-type', 'formula');
       node.oninput = () => {
         console.log('INPUT');
       };
+
+      node.append(mathinput);
+
+      // setTimeout(() => {
+      //   const doc = node.contentDocument || node?.contentWindow?.document;
+
+      //   if (!doc) return;
+
+      //   doc.body.appendChild(mathinput);
+      // }, 0);
 
       // const mathfield = new MathfieldElement();
       // mathfield.value = '';
