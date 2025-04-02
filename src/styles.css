@@ -3,14 +3,18 @@
   border: 1px solid red;
 }
 
+#text-editor>div {
+
+}
+
 #text-editor-scroller {
   min-height: 300px;
 }
 
-math-field {
-  min-width: 100px;
-  height: 100px;
-}
+/* math-field {
+  width: 100px !important;
+  height: 100px !important;
+} */
 
 /* Hide the virtual keyboard toggle */
 math-field::part(virtual-keyboard-toggle) {

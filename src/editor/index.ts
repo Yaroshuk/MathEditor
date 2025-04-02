@@ -154,16 +154,12 @@ export default class Editor {
 
         let nextModel = this.model;
 
-        const formulaModal = nextModel.find(
-            (token: TokenFormula) => token?.id === id
-        );
-
         nextModel = this.model.map((token: Token) => {
             if (token.type !== TokenType.Formula) return token;
 
             if (token?.id === id) {
                 return {
-                    ...formulaModal,
+                    ...token,
                     value: `${target?.value.at(0) === "$" ? "" : "$"}${String(
                         target?.value
                     ).trim()}${target?.value.at(-1) === "$" ? "" : "$"}`,
@@ -189,15 +185,40 @@ export default class Editor {
     private onMathFocus = (evt: FocusEvent) => {
         const target = evt.target as HTMLElement;
 
-        if (target.dataset?.type !== "formula") return;
+        let container = target.closest("button");
 
-        const parent = target.parentElement;
+        if (container?.dataset?.type !== "formula-container") return;
 
-        if (parent.dataset?.type !== "formula-container") return;
+        const mathinput = container.firstChild as MathfieldElement;
 
-        this.activeFormulaValue = parent.dataset?.raw;
+        if (mathinput?.dataset?.type !== "formula") return;
 
-        //console.log("focus", target);
+        const id = container.dataset?.id;
+
+        let nextModel = this.model;
+
+        nextModel = this.model.map((token: Token) => {
+            if (token.type !== TokenType.Formula) return token;
+
+            if (token?.id === id) {
+                return {
+                    ...token,
+                    event: FormulaEvent.Create,
+                };
+            }
+
+            return token;
+        });
+
+        this.updateModel(nextModel, false, [0, 0]);
+
+        console.log("Mathfield", mathinput);
+
+        // if (target.dataset?.type !== "formula") return;
+
+        // const parent = target.parentElement;
+
+        // this.activeFormulaValue = parent.dataset?.raw;
 
         evt.stopImmediatePropagation();
     };
