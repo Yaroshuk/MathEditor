@@ -1,21 +1,20 @@
 import { TokenFormat, TokenType } from "./types";
-import type ParserState from "./state";
+import ParserState from "./state";
 import { Codes, consumeNumbers } from "./utils";
 
 export default function parseFormula(state: ParserState): boolean {
     const { pos } = state;
     if (state.options.formula) {
-        if (state.consume(Codes.LeftAngle)) {
-            if (consumeNumbers(state) && state.consume(Codes.RightAngle)) {
+        if (state.consume(Codes.Dollar)) {
+            console.log("PARSEFORMULE", state);
+            if (consumeFormula(state) && state.consume(Codes.Dollar)) {
                 const value = state.substring(pos);
                 console.log("READER", state, value);
                 // if (state.consume(Codes.Dollar)) {
                 // Разрешаем поглотить самостоятельный символ `@`, чтобы показывать
                 // его в редакторе и при необходимости вывести автокомплит
 
-                const random = 
-
-                state.push({
+                const random = state.push({
                     type: TokenType.Formula,
                     format: TokenFormat.None,
                     value: value,
@@ -30,4 +29,11 @@ export default function parseFormula(state: ParserState): boolean {
     // }
 
     return false;
+}
+
+function consumeFormula(state: ParserState): boolean {
+    return state.consumeWhile((ch) => {
+        console.log("CH", ch);
+        return ch !== Codes.Dollar;
+    });
 }

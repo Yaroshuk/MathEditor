@@ -5,7 +5,7 @@ import { Codes } from "./utils";
 export default function parseFormula(state: ParserState): boolean {
     const { pos } = state;
     if (state.options.formula) {
-        if (state.consume(Codes.Dollar)) {
+        if (state.consume(Codes.Slash)) {
             console.log("parseFormula", state);
             // if (state.consume(Codes.Dollar)) {
             // Разрешаем поглотить самостоятельный символ `@`, чтобы показывать
@@ -13,7 +13,7 @@ export default function parseFormula(state: ParserState): boolean {
             state.push({
                 type: TokenType.Formula,
                 format: TokenFormat.None,
-                value: `<${Math.random().toString().substring(2, 5)}>`,
+                value: `$(x+7)^2+6(x^2-10)$`,
                 id: "123",
             });
             return true;

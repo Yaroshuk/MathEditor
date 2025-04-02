@@ -20,9 +20,9 @@ const editor = new Editor(document.querySelector('#text-editor'), {
     shortcuts,
     parse: {
         // textEmoji: true,
-        // hashtag: true,
-        // mention: true,
-        // command: true,
+        hashtag: true,
+        mention: true,
+        command: true,
         // userSticker: true,
         // link: true,
         // stickyLink: true,
