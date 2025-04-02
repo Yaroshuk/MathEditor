@@ -1,4 +1,4 @@
-import { TokenFormat, TokenType } from "./types";
+import { FormulaEvent, TokenFormat, TokenType } from "./types";
 import type ParserState from "./state";
 import { Codes } from "./utils";
 
@@ -6,7 +6,7 @@ export default function parseFormula(state: ParserState): boolean {
     const { pos } = state;
     if (state.options.formula) {
         if (state.consume(Codes.Slash)) {
-            console.log("parseFormula", state);
+            console.log("FORMULA_CREATOR", state);
             // if (state.consume(Codes.Dollar)) {
             // Разрешаем поглотить самостоятельный символ `@`, чтобы показывать
             // его в редакторе и при необходимости вывести автокомплит
@@ -14,7 +14,8 @@ export default function parseFormula(state: ParserState): boolean {
                 type: TokenType.Formula,
                 format: TokenFormat.None,
                 value: `$(x+7)^2+6(x^2-10)$`,
-                id: "123",
+                event: FormulaEvent.Create,
+                id: Math.random().toString(36).substring(7),
             });
             return true;
         }

@@ -1,9 +1,9 @@
-import parse, { getLength, TokenFormat, TokenType } from '../parser';
-import type { Token } from '../parser';
-import render, { dispatch, isEmoji } from '../render';
-import type { BaseEditorOptions, TextRange, Model } from './types';
-import History, { type HistoryEntry } from './history';
-import { getTextRange, rangeToLocation, setDOMRange, setRange } from './range';
+import parse, { getLength, TokenFormat, TokenType } from "../parser";
+import type { Token } from "../parser";
+import render, { dispatch, isEmoji } from "../render";
+import type { BaseEditorOptions, TextRange, Model } from "./types";
+import History, { type HistoryEntry } from "./history";
+import { getTextRange, rangeToLocation, setDOMRange, setRange } from "./range";
 import {
     cutText,
     getText,
@@ -14,27 +14,37 @@ import {
     toggleFormat,
     updateFromInputEvent,
     updateFromInputEventFallback,
-    updateFromOldEvent
-} from './update';
-import { setLink, slice, mdToText, textToMd, getFormat } from '../formatted-string';
-import type { TokenFormatUpdate, TextRange as Rng } from '../formatted-string';
-import Shortcuts from './shortcuts';
-import type { ShortcutHandler } from './shortcuts';
-import { getInputText, isCollapsed, isElement, startsWith } from './utils';
-import parseHTML from '../parser/html2';
-import toHTML from '../render/html';
-import { last } from '../parser/utils';
-import { objectMerge } from '../utils/objectMerge';
+    updateFromOldEvent,
+} from "./update";
+import {
+    setLink,
+    slice,
+    mdToText,
+    textToMd,
+    getFormat,
+} from "../formatted-string";
+import type { TokenFormatUpdate, TextRange as Rng } from "../formatted-string";
+import Shortcuts from "./shortcuts";
+import type { ShortcutHandler } from "./shortcuts";
+import { getInputText, isCollapsed, isElement, startsWith } from "./utils";
+import parseHTML from "../parser/html2";
+import toHTML from "../render/html";
+import { last } from "../parser/utils";
+import { objectMerge } from "../utils/objectMerge";
+import type { MathfieldElement } from "mathlive";
+import { FormulaEvent, type TokenFormula } from "../parser/types";
 
 const enum DiffActionType {
-    Insert = 'insert',
-    Remove = 'remove',
-    Replace = 'replace',
-    Compose = 'compose'
+    Insert = "insert",
+    Remove = "remove",
+    Replace = "replace",
+    Compose = "compose",
 }
 
 const enum DirtyState {
-    None, Dirty, DirtyRetainNewline
+    None,
+    Dirty,
+    DirtyRetainNewline,
 }
 
 export interface EditorOptions extends BaseEditorOptions {
@@ -51,7 +61,10 @@ export interface EditorOptions extends BaseEditorOptions {
     scroller?: HTMLElement;
 }
 
-type EventName = 'editor-selectionchange' | 'editor-formatchange' | 'editor-update';
+type EventName =
+    | "editor-selectionchange"
+    | "editor-formatchange"
+    | "editor-update";
 
 interface EditorEventDetails {
     editor: Editor;
@@ -64,7 +77,7 @@ interface PickLinkOptions {
      * Функция, которая на вход принимает текущую ссылку, если она есть, и должна
      * вернуть новую ссылку или Promise, который вернёт ссылку
      */
-    url: (currentUrl: string) => string | Promise<string>,
+    url: (currentUrl: string) => string | Promise<string>;
 
     /**
      * Диапазон, для которого нужно выставить ссылку. Если не указан,
@@ -74,10 +87,10 @@ interface PickLinkOptions {
 }
 
 /** MIME-тип для хранения отформатированной строки в буффере */
-const fragmentMIME = 'tamtam/fragment';
+const fragmentMIME = "tamtam/fragment";
 
 const defaultPickLinkOptions: PickLinkOptions = {
-    url: cur => prompt('Введите ссылку', cur)
+    url: (cur) => prompt("Введите ссылку", cur),
 };
 
 export default class Editor {
@@ -105,21 +118,113 @@ export default class Editor {
     private focused = false;
     private rafId = 0;
 
+    private activeFormulaValue: string;
+
     /**
      * @param element Контейнер, в котором будет происходить редактирование
      */
-    constructor(public element: HTMLElement, public options: EditorOptions = {}) {
-        const value = options.value || '';
+    constructor(
+        public element: HTMLElement,
+        public options: EditorOptions = {}
+    ) {
+        const value = options.value || "";
         this.model = parse(this.sanitizeText(value), options.parse);
         this.history = new History({
-            compactActions: [DiffActionType.Insert, DiffActionType.Remove]
+            compactActions: [DiffActionType.Insert, DiffActionType.Remove],
         });
         this.shortcuts = new Shortcuts(this);
         this.setup();
         // this.setSelection(value.length);
-        this.history.push(this.model, 'init', this.caret);
+        this.history.push(this.model, "init", this.caret);
         this._inited = true;
+        this.activeFormulaValue = "";
     }
+
+    private onMathBlur = (evt: FocusEvent) => {
+        const target = evt.target as MathfieldElement;
+
+        if (target.dataset?.type !== "formula") return;
+
+        const parent = target.parentElement;
+
+        if (parent.dataset?.type !== "formula-container") return;
+
+        const id = parent.dataset?.id;
+        //parent.setAttribute("data-raw", target?.value);
+
+        let nextModel = this.model;
+
+        const formulaModal = nextModel.find(
+            (token: TokenFormula) => token?.id === id
+        );
+
+        nextModel = this.model.map((token: Token) => {
+            if (token.type !== TokenType.Formula) return token;
+
+            if (token?.id === id) {
+                return {
+                    ...formulaModal,
+                    value: `${target?.value.at(0) === "$" ? "" : "$"}${String(
+                        target?.value
+                    ).trim()}${target?.value.at(-1) === "$" ? "" : "$"}`,
+                    event: FormulaEvent.Update,
+                };
+            }
+
+            return token;
+        });
+
+        //   {
+        //     ...formulaModal,
+        //     value: `$${target?.value}$`,
+        //     event: FormulaEvent.Update,
+        // },
+
+        const range = getTextRange(this.element);
+
+        this.updateModel(nextModel, false, range);
+        //evt.stopImmediatePropagation();
+    };
+
+    private onMathFocus = (evt: FocusEvent) => {
+        const target = evt.target as HTMLElement;
+
+        if (target.dataset?.type !== "formula") return;
+
+        const parent = target.parentElement;
+
+        if (parent.dataset?.type !== "formula-container") return;
+
+        this.activeFormulaValue = parent.dataset?.raw;
+
+        //console.log("focus", target);
+
+        evt.stopImmediatePropagation();
+    };
+
+    private onMathKeyDown = (evt: KeyboardEvent) => {
+        const target = evt.target as HTMLElement;
+
+        if (target.dataset?.type !== "formula") return;
+
+        evt.stopImmediatePropagation();
+    };
+
+    private onMathBeforeInput = (evt: InputEvent) => {
+        const target = evt.target as HTMLElement;
+
+        if (target.dataset?.type !== "formula") return;
+
+        evt.stopImmediatePropagation();
+    };
+
+    private onMathInput = (evt: InputEvent) => {
+        const target = evt.target as HTMLElement;
+
+        if (target.dataset?.type !== "formula") return;
+
+        evt.stopImmediatePropagation();
+    };
 
     private onKeyDown = (evt: KeyboardEvent) => {
         if (!evt.defaultPrevented) {
@@ -127,29 +232,37 @@ export default class Editor {
         }
 
         this.handleEnter(evt);
-    }
+    };
 
     private onCompositionStart = () => {
         this.compositionStartRange = getTextRange(this.element);
         this.compositionRange = null;
-    }
+    };
 
     private onCompositionUpdate = () => {
         this.compositionRange = this.getCompositionRange();
-    }
+    };
 
     private onCompositionEnd = () => {
         this.compositionStartRange = null;
-    }
+    };
 
     private onBeforeInput = (evt: InputEvent) => {
-        if (evt.inputType === 'historyUndo') {
+        const target = evt.target as HTMLElement;
+
+        if (target.dataset?.type === "formula") {
+            console.log("beforeinput", target.dataset?.type);
+            evt.stopPropagation();
+            return;
+        }
+
+        if (evt.inputType === "historyUndo") {
             this.undo();
             evt.preventDefault();
             return;
         }
 
-        if (evt.inputType === 'historyRedo') {
+        if (evt.inputType === "historyRedo") {
             this.redo();
             evt.preventDefault();
             return;
@@ -166,12 +279,25 @@ export default class Editor {
         if (!range) {
             range = getTextRange(this.element);
         }
-        this.pendingModel = updateFromInputEvent(evt, this.model, range, this.options);
-    }
+        this.pendingModel = updateFromInputEvent(
+            evt,
+            this.model,
+            range,
+            this.options
+        );
+    };
 
     private onInput = (evt: InputEvent) => {
         let nextModel: Model;
         const range = getTextRange(this.element);
+
+        const target = evt.target as HTMLElement;
+
+        // if (target?.dataset?.type === "formula") {
+        //     console.log("input", target?.dataset?.type);
+        //     evt.stopPropagation();
+        //     return;
+        // }
 
         if (this.pendingModel) {
             nextModel = this.pendingModel;
@@ -185,8 +311,20 @@ export default class Editor {
         } else {
             const prevRange = this.compositionRange || this.caret;
             nextModel = evt.inputType
-                ? updateFromInputEventFallback(evt, this.model, range, prevRange, this.options)
-                : updateFromOldEvent(this.getInputText(), this.model, range, prevRange, this.options);
+                ? updateFromInputEventFallback(
+                      evt,
+                      this.model,
+                      range,
+                      prevRange,
+                      this.options
+                  )
+                : updateFromOldEvent(
+                      this.getInputText(),
+                      this.model,
+                      range,
+                      prevRange,
+                      this.options
+                  );
             this.compositionRange = null;
         }
 
@@ -194,7 +332,7 @@ export default class Editor {
         if (nextModel) {
             this.updateModel(nextModel, getDiffTypeFromEvent(evt), range);
         }
-    }
+    };
 
     private onSelectionChange = () => {
         if (this.dirty !== DirtyState.None) {
@@ -205,7 +343,7 @@ export default class Editor {
         if (range) {
             this.saveSelection(range);
         }
-    }
+    };
 
     /**
      * Обработка события копирования текста
@@ -214,7 +352,7 @@ export default class Editor {
         if (this.copyFragment(evt.clipboardData)) {
             evt.preventDefault();
         }
-    }
+    };
 
     /**
      * Обработка события вырезания текста
@@ -223,7 +361,7 @@ export default class Editor {
         if (this.copyFragment(evt.clipboardData, true)) {
             evt.preventDefault();
         }
-    }
+    };
 
     /**
      * Обработка события вставки текста
@@ -237,13 +375,13 @@ export default class Editor {
 
         const range = getTextRange(this.element);
         const parsed = getFormattedString(evt.clipboardData, this.options);
-        const fragment: string | Token[] = parsed
-            || sanitize(evt.clipboardData.getData('text/plain') || '');
+        const fragment: string | Token[] =
+            parsed || sanitize(evt.clipboardData.getData("text/plain") || "");
 
         if (fragment && range) {
             let len = 0;
-            if (typeof fragment === 'string') {
-                len = fragment.length
+            if (typeof fragment === "string") {
+                len = fragment.length;
             } else {
                 len = getLength(fragment);
                 if (last(fragment)?.format) {
@@ -251,18 +389,20 @@ export default class Editor {
                     // чтобы пользователь продолжал писать в том же формате, что и был
                     fragment.push({
                         type: TokenType.Text,
-                        value: '',
+                        value: "",
                         format: getFormat(this.model, range[0]),
-                        sticky: true
+                        sticky: true,
                     });
                 }
             }
             this.paste(fragment, range[0], range[1]);
             this.setSelection(range[0] + len);
 
-            requestAnimationFrame(() => retainNewlineInViewport(this.getScroller()));
+            requestAnimationFrame(() =>
+                retainNewlineInViewport(this.getScroller())
+            );
         }
-    }
+    };
 
     private onClick = (evt: MouseEvent) => {
         if (isEmoji(evt.target as Node)) {
@@ -282,17 +422,17 @@ export default class Editor {
 
             setDOMRange(range);
         }
-    }
+    };
 
     private onFocus = () => {
         this.focused = true;
-        document.addEventListener('selectionchange', this.onSelectionChange);
-    }
+        document.addEventListener("selectionchange", this.onSelectionChange);
+    };
 
     private onBlur = () => {
         this.focused = false;
-        document.removeEventListener('selectionchange', this.onSelectionChange);
-    }
+        document.removeEventListener("selectionchange", this.onSelectionChange);
+    };
 
     get model(): Model {
         return this._model;
@@ -316,7 +456,7 @@ export default class Editor {
      * Вернёт `true` если редактор работает в режиме Markdown
      */
     get isMarkdown(): boolean {
-        return !!(this.options.parse?.markdown);
+        return !!this.options.parse?.markdown;
     }
 
     /**
@@ -326,7 +466,7 @@ export default class Editor {
     setup(): void {
         const { element } = this;
 
-        element.contentEditable = 'true';
+        element.contentEditable = "true";
         element.translate = false;
 
         // Чек-лист для проверки ввода
@@ -346,18 +486,23 @@ export default class Editor {
         //   insertText: null, а не beforeinput: deleteContentForward
         // * В Windows при использорвании нативной панели с эмоджи, само эмоджи
         //   вставляется через два события input: insertCompositionText и insertText
-        element.addEventListener('keydown', this.onKeyDown);
-        element.addEventListener('compositionstart', this.onCompositionStart);
-        element.addEventListener('compositionupdate', this.onCompositionUpdate);
-        element.addEventListener('compositionend', this.onCompositionEnd);
-        element.addEventListener('beforeinput', this.onBeforeInput);
-        element.addEventListener('input', this.onInput);
-        element.addEventListener('cut', this.onCut);
-        element.addEventListener('copy', this.onCopy);
-        element.addEventListener('paste', this.onPaste);
-        element.addEventListener('click', this.onClick);
-        element.addEventListener('focus', this.onFocus);
-        element.addEventListener('blur', this.onBlur);
+        element.addEventListener("focus", this.onMathFocus, true);
+        element.addEventListener("blur", this.onMathBlur, true);
+        element.addEventListener("keydown", this.onMathKeyDown);
+        element.addEventListener("beforeinput", this.onMathBeforeInput);
+        element.addEventListener("input", this.onMathInput);
+        element.addEventListener("keydown", this.onKeyDown);
+        element.addEventListener("compositionstart", this.onCompositionStart);
+        element.addEventListener("compositionupdate", this.onCompositionUpdate);
+        element.addEventListener("compositionend", this.onCompositionEnd);
+        element.addEventListener("beforeinput", this.onBeforeInput);
+        element.addEventListener("input", this.onInput);
+        element.addEventListener("cut", this.onCut);
+        element.addEventListener("copy", this.onCopy);
+        element.addEventListener("paste", this.onPaste);
+        element.addEventListener("click", this.onClick);
+        element.addEventListener("focus", this.onFocus);
+        element.addEventListener("blur", this.onBlur);
 
         const { shortcuts } = this.options;
 
@@ -372,19 +517,30 @@ export default class Editor {
     dispose(): void {
         const { element } = this;
 
-        element.removeEventListener('keydown', this.onKeyDown);
-        element.removeEventListener('compositionstart', this.onCompositionStart);
-        element.removeEventListener('compositionupdate', this.onCompositionUpdate);
-        element.removeEventListener('compositionend', this.onCompositionEnd);
-        element.removeEventListener('beforeinput', this.onBeforeInput);
-        element.removeEventListener('input', this.onInput);
-        element.removeEventListener('cut', this.onCut);
-        element.removeEventListener('copy', this.onCopy);
-        element.removeEventListener('paste', this.onPaste);
-        element.removeEventListener('click', this.onClick);
-        element.removeEventListener('focus', this.onFocus);
-        element.removeEventListener('blur', this.onBlur);
-        document.removeEventListener('selectionchange', this.onSelectionChange);
+        element.removeEventListener("focus", this.onMathFocus, true);
+        element.removeEventListener("blur", this.onMathBlur, true);
+        element.removeEventListener("keydown", this.onMathKeyDown);
+        element.removeEventListener("beforeinput", this.onMathBeforeInput);
+        element.removeEventListener("input", this.onMathInput);
+        element.removeEventListener("keydown", this.onKeyDown);
+        element.removeEventListener(
+            "compositionstart",
+            this.onCompositionStart
+        );
+        element.removeEventListener(
+            "compositionupdate",
+            this.onCompositionUpdate
+        );
+        element.removeEventListener("compositionend", this.onCompositionEnd);
+        element.removeEventListener("beforeinput", this.onBeforeInput);
+        element.removeEventListener("input", this.onInput);
+        element.removeEventListener("cut", this.onCut);
+        element.removeEventListener("copy", this.onCopy);
+        element.removeEventListener("paste", this.onPaste);
+        element.removeEventListener("click", this.onClick);
+        element.removeEventListener("focus", this.onFocus);
+        element.removeEventListener("blur", this.onBlur);
+        document.removeEventListener("selectionchange", this.onSelectionChange);
     }
 
     /////////// Публичные методы для работы с текстом ///////////
@@ -409,7 +565,8 @@ export default class Editor {
         const result = this.updateModel(
             removeText(this.model, from, to, this.options),
             DiffActionType.Remove,
-            [from, to]);
+            [from, to]
+        );
 
         return result;
     }
@@ -428,7 +585,7 @@ export default class Editor {
      */
     cut(from: number, to: number): Model {
         const result = cutText(this.model, from, to, this.options);
-        this.updateModel(result.tokens, 'cut', [from, to]);
+        this.updateModel(result.tokens, "cut", [from, to]);
         return result.cut;
     }
 
@@ -438,9 +595,9 @@ export default class Editor {
     paste(text: string | Model, from: number, to: number): Model {
         text = this.sanitizeText(text);
         const nextModel = replaceText(this.model, text, from, to, this.options);
-        const len = typeof text === 'string' ? text.length : getLength(text);
+        const len = typeof text === "string" ? text.length : getLength(text);
         const pos = from + len;
-        return this.updateModel(nextModel, 'paste', [pos, pos]);
+        return this.updateModel(nextModel, "paste", [pos, pos]);
     }
 
     /**
@@ -455,14 +612,18 @@ export default class Editor {
     /**
      * Обновляет форматирование у указанного диапазона
      */
-    updateFormat(format: TokenFormat | TokenFormatUpdate, from: number, to = from): Model {
+    updateFormat(
+        format: TokenFormat | TokenFormatUpdate,
+        from: number,
+        to = from
+    ): Model {
         const result = this.updateModel(
             setFormat(this.model, format, from, to, this.options),
-            'format',
+            "format",
             [from, to]
         );
         setRange(this.element, from, to);
-        this.emit('editor-formatchange');
+        this.emit("editor-formatchange");
         return result;
     }
 
@@ -479,14 +640,10 @@ export default class Editor {
         }
 
         const model = toggleFormat(this.model, format, from, to, this.options);
-        const result = this.updateModel(
-            model,
-            'format',
-            [from, to]
-        );
+        const result = this.updateModel(model, "format", [from, to]);
 
         setRange(this.element, from, to);
-        this.emit('editor-formatchange');
+        this.emit("editor-formatchange");
         return result;
     }
 
@@ -499,7 +656,7 @@ export default class Editor {
     pickLink(options: PickLinkOptions = defaultPickLinkOptions): void {
         const [from, to] = options.range || this.getSelection();
         let token = this.tokenForPos(from);
-        let currentUrl = '';
+        let currentUrl = "";
 
         if (token) {
             if (token.format & TokenFormat.LinkLabel) {
@@ -519,8 +676,8 @@ export default class Editor {
         }
 
         const result = options.url(currentUrl);
-        if (result && typeof result === 'object' && result.then) {
-            result.then(nextUrl => {
+        if (result && typeof result === "object" && result.then) {
+            result.then((nextUrl) => {
                 if (nextUrl !== currentUrl) {
                     this.setLink(nextUrl, from, to);
                 }
@@ -551,7 +708,7 @@ export default class Editor {
             updated = setLink(this.model, url, range[0], range[1]);
         }
 
-        return this.updateModel(updated, 'link');
+        return this.updateModel(updated, "link");
     }
 
     /**
@@ -642,7 +799,7 @@ export default class Editor {
      * очищается история изменений редактора
      */
     setValue(value: string | Model, selection?: TextRange): void {
-        if (typeof value === 'string') {
+        if (typeof value === "string") {
             value = parse(this.sanitizeText(value), this.options.parse);
         }
 
@@ -655,7 +812,7 @@ export default class Editor {
         this.model = value;
 
         this.history.clear();
-        this.history.push(this.model, 'init', this.caret);
+        this.history.push(this.model, "init", this.caret);
     }
 
     /**
@@ -714,7 +871,11 @@ export default class Editor {
     /**
      * Подписываемся на указанное событие
      */
-    on(eventType: EventName, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): this {
+    on(
+        eventType: EventName,
+        listener: EventListenerOrEventListenerObject,
+        options?: boolean | AddEventListenerOptions
+    ): this {
         this.element.addEventListener(eventType, listener, options);
         return this;
     }
@@ -722,7 +883,11 @@ export default class Editor {
     /**
      * Отписываемся от указанного события
      */
-    off(eventType: EventName, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): this {
+    off(
+        eventType: EventName,
+        listener: EventListenerOrEventListenerObject,
+        options?: boolean | AddEventListenerOptions
+    ): this {
         this.element.removeEventListener(eventType, listener, options);
         return this;
     }
@@ -736,7 +901,7 @@ export default class Editor {
         this.caret = range;
         this.history.saveCaret(range);
         if (caret[0] !== range[0] || caret[1] !== range[1]) {
-            this.emit('editor-selectionchange');
+            this.emit("editor-selectionchange");
         }
     }
 
@@ -748,9 +913,13 @@ export default class Editor {
      * @param range Диапазон выделения, который нужно сохранить в качестве текущего
      * в записи в истории
      */
-    private updateModel(value: Model, action?: string | false, range?: TextRange): Model {
+    private updateModel(
+        value: Model,
+        action?: string | false,
+        range?: TextRange
+    ): Model {
         if (value !== this.model) {
-            if (typeof action === 'string') {
+            if (typeof action === "string") {
                 this.history.push(value, action, range);
             }
             this.model = value;
@@ -775,8 +944,8 @@ export default class Editor {
                 ? this.cut(range[0], range[1])
                 : this.slice(range[0], range[1]);
 
-            clipboard.setData('text/plain', getText(fragment));
-            clipboard.setData('text/html', toHTML(fragment));
+            clipboard.setData("text/plain", getText(fragment));
+            clipboard.setData("text/html", toHTML(fragment));
 
             if (!this.isMarkdown) {
                 clipboard.setData(fragmentMIME, JSON.stringify(fragment));
@@ -808,7 +977,7 @@ export default class Editor {
         }
 
         this.dirty = DirtyState.None;
-        this.emit('editor-update');
+        this.emit("editor-update");
     }
 
     private scheduleSyncUI() {
@@ -827,13 +996,15 @@ export default class Editor {
             fixTrailingLine: true,
             replaceTextEmoji: !!this.options.parse?.textEmoji,
             emoji: this.options.emoji,
-            nowrap: this.options.nowrap
+            nowrap: this.options.nowrap,
         });
     }
 
     private emit(eventName: EventName): void {
         if (this._inited) {
-            dispatch<EditorEventDetails>(this.element, eventName, { editor: this });
+            dispatch<EditorEventDetails>(this.element, eventName, {
+                editor: this,
+            });
         }
     }
 
@@ -843,17 +1014,17 @@ export default class Editor {
     }
 
     private handleEnter(evt: KeyboardEvent): void {
-        if (!evt.defaultPrevented && evt.key === 'Enter' && hasModifier(evt)) {
+        if (!evt.defaultPrevented && evt.key === "Enter" && hasModifier(evt)) {
             evt.preventDefault();
             const range = getTextRange(this.element);
-            const text = '\n';
+            const text = "\n";
             if (isCollapsed(range)) {
                 this.insertText(range[0], text);
             } else {
                 this.replaceText(range[0], range[1], text);
             }
 
-            this.setSelection(range[0]+ text.length);
+            this.setSelection(range[0] + text.length);
             this.dirty = DirtyState.DirtyRetainNewline;
         }
     }
@@ -864,9 +1035,11 @@ export default class Editor {
     private sanitizeText<T extends string | Model>(text: T): T {
         const { nowrap } = this.options;
 
-        return typeof text === 'string'
-            ? sanitize(text, nowrap) as T
-            : text.map(t => objectMerge(t, { value: sanitize(t.value, nowrap) })) as T;
+        return typeof text === "string"
+            ? (sanitize(text, nowrap) as T)
+            : (text.map((t) =>
+                  objectMerge(t, { value: sanitize(t.value, nowrap) })
+              ) as T);
     }
 
     private getCompositionRange(): TextRange {
@@ -913,7 +1086,8 @@ function retainNewlineInViewport(element: Element): void {
         const parentRect = element.getBoundingClientRect();
         if (rect.top < parentRect.top || rect.bottom > parentRect.bottom) {
             // Курсор за пределами вьюпорта
-            element.scrollTop += rect.top - (parentRect.top + parentRect.height / 2);
+            element.scrollTop +=
+                rect.top - (parentRect.top + parentRect.height / 2);
         }
     }
 }
@@ -923,16 +1097,19 @@ function retainNewlineInViewport(element: Element): void {
  */
 function getScrollTarget(r: Range): Element | undefined {
     const target = r.startContainer.childNodes[r.startOffset];
-    return target && isElement(target) ? target : r.startContainer as Element;
+    return target && isElement(target) ? target : (r.startContainer as Element);
 }
 
-function getFormattedString(data: DataTransfer, options: EditorOptions): Token[] | undefined {
+function getFormattedString(
+    data: DataTransfer,
+    options: EditorOptions
+): Token[] | undefined {
     const internalData = data.getData(fragmentMIME);
 
     if (internalData) {
-        return typeof internalData === 'string'
-            ? JSON.parse(internalData) as Token[]
-            : internalData
+        return typeof internalData === "string"
+            ? (JSON.parse(internalData) as Token[])
+            : internalData;
     }
 
     if (options.html) {
@@ -940,12 +1117,15 @@ function getFormattedString(data: DataTransfer, options: EditorOptions): Token[]
         // добавляет ещё и HTML. В итоге просто так вставить ссылку не получится.
         // Поэтому мы сначала проверим plain text: если это ссылка, то оставим её
         // как есть, без парсинга HTML.
-        const plain = parse(sanitize(data.getData('text/plain') || ''), options.parse);
+        const plain = parse(
+            sanitize(data.getData("text/plain") || ""),
+            options.parse
+        );
         if (plain.length === 1 && plain[0].type === TokenType.Link) {
             return plain;
         }
 
-        const html = data.getData('text/html');
+        const html = data.getData("text/html");
         if (html) {
             return parseHTML(sanitize(html), { links: options.htmlLinks });
         }
@@ -955,32 +1135,32 @@ function getFormattedString(data: DataTransfer, options: EditorOptions): Token[]
 function getDiffTypeFromEvent(evt: InputEvent): DiffActionType | string {
     const { inputType } = evt;
     if (inputType) {
-        if (startsWith(inputType, 'insert')) {
+        if (startsWith(inputType, "insert")) {
             return DiffActionType.Insert;
         }
 
-        if (startsWith(inputType, 'delete')) {
+        if (startsWith(inputType, "delete")) {
             return DiffActionType.Remove;
         }
 
-        if (startsWith(inputType, 'format')) {
-            return 'format';
+        if (startsWith(inputType, "format")) {
+            return "format";
         }
     }
 
-    return 'update';
+    return "update";
 }
 
 function sanitize(text: string, nowrap?: boolean): string {
     // eslint-disable-next-line no-control-regex
-    text = text.replace(/\x00/g, ' ');
+    text = text.replace(/\x00/g, " ");
     return nowrap
-        ? text.replace(/(\r\n?|\n)/g, ' ')
-        : text.replace(/\r\n?/g, '\n');
+        ? text.replace(/(\r\n?|\n)/g, " ")
+        : text.replace(/\r\n?/g, "\n");
 }
 
 function isFilePaste(data: DataTransfer) {
-    if (data.types.includes('Files')) {
+    if (data.types.includes("Files")) {
         // Есть файл в клипборде: это может быть как непосредственно файл,
         // так и скриншот текста из ворда, например. При этом, даже если это
         // именно файл, рядом может лежать текст, в котором может быть написано
@@ -992,9 +1172,9 @@ function isFilePaste(data: DataTransfer) {
         let texts = 0;
         for (let i = 0; i < data.items.length; i++) {
             const item = data.items[i];
-            if (item.kind === 'string') {
+            if (item.kind === "string") {
                 texts++;
-            } else if (item.kind === 'file') {
+            } else if (item.kind === "file") {
                 files++;
             }
         }

@@ -1,14 +1,14 @@
-import type { Tree } from './tree';
+import type { Tree } from "./tree";
 
 export interface ParserOptions {
     /** Использовать MD-форматирование  */
     markdown: boolean;
 
     /** Находить текстовые эмоджи типа `:)` */
-    textEmoji: boolean | 'force';
+    textEmoji: boolean | "force";
 
     /** Находить упоминания: `@user_name` */
-    mention: boolean | 'strict';
+    mention: boolean | "strict";
 
     /** Находить хэштэги: `#hashtag` */
     hashtag: boolean;
@@ -42,33 +42,38 @@ export interface ParserOptions {
 
 export enum TokenType {
     /** Обычный текстовый фрагмент */
-    Text = 'text',
+    Text = "text",
 
     /** Ссылка на внешний ресурс */
-    Link = 'link',
+    Link = "link",
 
     /**
      * Специальный пользовательский стикер с древних времён OK:
      * #u123456789s#
      */
-    UserSticker = 'user_sticker',
+    UserSticker = "user_sticker",
 
     /** Упоминание: @user_name */
-    Mention = 'mention',
+    Mention = "mention",
 
     /** Команда: /command */
-    Command = 'command',
+    Command = "command",
 
     /** Хэштэг: #hashtag */
-    HashTag = 'hashtag',
+    HashTag = "hashtag",
 
     /** Символ форматирования Markdown */
-    Markdown = 'markdown',
+    Markdown = "markdown",
 
     /** Перенос строки */
-    Newline = 'newline',
+    Newline = "newline",
 
-    Formula = 'formula'
+    Formula = "formula",
+}
+
+export enum FormulaEvent {
+    Create = "create",
+    Update = "update",
 }
 
 export enum TokenFormat {
@@ -105,8 +110,16 @@ export enum TokenFormat {
     Link = 1 << 9,
 }
 
-export type Token = TokenText | TokenLink | TokenUserSticker | TokenMention
-    | TokenCommand | TokenHashTag | TokenMarkdown | TokenNewline | TokenFormula;
+export type Token =
+    | TokenText
+    | TokenLink
+    | TokenUserSticker
+    | TokenMention
+    | TokenCommand
+    | TokenHashTag
+    | TokenMarkdown
+    | TokenNewline
+    | TokenFormula;
 
 export interface TokenBase {
     /** Тип токена */
@@ -185,7 +198,8 @@ export interface TokenNewline extends TokenBase {
 
 export interface TokenFormula extends TokenBase {
     type: TokenType.Formula;
-    id: string
+    event: FormulaEvent;
+    id: string;
 }
 
 export interface EmojiData {

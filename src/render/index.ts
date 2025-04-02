@@ -10,7 +10,11 @@ import type {
     TokenText,
 } from "../parser";
 import { TokenFormat, TokenType } from "../parser";
-import type { EmojiData, TokenFormula } from "../parser/types";
+import {
+    FormulaEvent,
+    type EmojiData,
+    type TokenFormula,
+} from "../parser/types";
 import { objectMerge } from "../utils/objectMerge";
 
 type ClassFormat = [type: TokenFormat, value: string];
@@ -93,8 +97,6 @@ export default function render(
     tokens: Token[],
     opt?: Partial<RenderOptions>
 ): void {
-    console.log("www", tokens);
-
     const options: RenderOptions = opt
         ? objectMerge(defaultOptions, opt)
         : defaultOptions;
@@ -163,7 +165,6 @@ function renderTokens(
 
     const groupEnd = nextInGroup(tokens, i);
     if (groupEnd !== i) {
-        console.log("GROUP");
         // Можем схлопнуть несколько токенов в один
         const baseFormat = token.format;
         state.enter(renderTokenContainer(token, state));
@@ -184,7 +185,6 @@ function renderTokens(
         return groupEnd;
     }
 
-    console.log("GROUP2", token.type, token.value);
     if (token.type === TokenType.Newline) {
         state.text(token.value);
     } else if (isPlainText(token)) {
@@ -388,42 +388,57 @@ class ReconcileState {
 
     mathfield(token: TokenFormula): HTMLElement {
         let node = this.container.childNodes[this.pos] as HTMLElement;
-        console.log("NODE", node);
+        console.log("RENDER", token)
 
-        if (!isElement(node) || node?.dataset?.type !== "formula") {
-            console.log("create");
+        if (
+            !isElement(node) ||
+            node?.dataset?.type !== "formula-container" ||
+            token.value !== node.dataset.raw ||
+            token.id !== node.dataset.id ||
+            token.event !== node.dataset.event
+        ) {
             node = document.createElement("button");
 
             //node.body.appendChild(bomNode);
             node.contentEditable = "false";
             node.style.userSelect = "all";
             node.style.display = "inline-block";
-            node.id = token.id
+            node.setAttribute("data-type", "formula-container");
+            node.setAttribute("data-id", token.id);
+            node.setAttribute("data-raw", token.value);
+            node.setAttribute("data-event", token.event);
             //node.style.position = 'relative';
 
-            const mathinput = new MathfieldElement();
+            let mathinput = new MathfieldElement();
+            mathinput.setAttribute("data-type", "formula");
+            node.append(mathinput);
+
+            mathinput.value = token.value;
+
+            if (token.event === FormulaEvent.Create) {
+                setTimeout(() => {
+                    this.container.blur();
+                    mathinput.focus();
+                }, 0);
+            } else {
+                mathinput.contentEditable = "false";
+                mathinput.style.userSelect = "none";
+                mathinput.style.display = "inline-block";
+            }
 
             // mathinput.autofocus = true;
             // mathinput.focus();
             //mathinput.innerHTML = '&#xfeff;';
-            mathinput.value = token.value;
-            mathinput.contentEditable = "false";
-            mathinput.style.userSelect = "none";
-            mathinput.style.display = "inline-block";
+
             // mathinput.style.position = 'relative';
 
             // node.innerHTML += '&#xfeff;';
-            node.setAttribute("data-raw", token.value);
-            node.setAttribute("data-type", "formula");
-            node.oninput = () => {
-                console.log("INPUT");
-            };
-
-            node.append(mathinput);
 
             insertAt(this.container, node, this.pos);
         }
 
+        // if (!isElement(mathinput) || mathinput?.dataset?.type !== "formula") {
+        // }
         this.pos++;
         return node as HTMLElement;
     }
