@@ -220,11 +220,13 @@ export default class Editor {
 
         // this.activeFormulaValue = parent.dataset?.raw;
 
-        evt.stopImmediatePropagation();
+        //evt.stopImmediatePropagation();
     };
 
     private onMathKeyDown = (evt: KeyboardEvent) => {
         const target = evt.target as HTMLElement;
+
+        console.log(target, this.getSelection());
 
         if (target.dataset?.type !== "formula") return;
 
@@ -248,6 +250,24 @@ export default class Editor {
     };
 
     private onKeyDown = (evt: KeyboardEvent) => {
+        const range = getTextRange(this.element);
+
+        const target = evt.target as HTMLElement;
+
+        if (evt.key === "ArrowLeft") {
+            console.log(
+                evt.key,
+                this.getSelection(),
+                this.tokenForPos(Math.max(range[0], 0), true)
+            );
+        } else {
+            console.log(
+                evt.key,
+                this.getSelection(),
+                this.tokenForPos(Math.max(range[0], 0))
+            );
+        }
+
         if (!evt.defaultPrevented) {
             this.shortcuts.handle(evt);
         }
@@ -509,7 +529,7 @@ export default class Editor {
         //   вставляется через два события input: insertCompositionText и insertText
         element.addEventListener("focus", this.onMathFocus, true);
         element.addEventListener("blur", this.onMathBlur, true);
-        element.addEventListener("keydown", this.onMathKeyDown);
+        // element.addEventListener("keydown", this.onMathKeyDown);
         element.addEventListener("beforeinput", this.onMathBeforeInput);
         element.addEventListener("input", this.onMathInput);
         element.addEventListener("keydown", this.onKeyDown);
