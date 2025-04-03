@@ -140,6 +140,26 @@ export default class Editor {
         this.activeFormulaValue = "";
     }
 
+    private onMathChange = (evt: Event) => {
+        const target = evt.target as MathfieldElement;
+
+        let container = target.closest("button");
+
+        if (container?.dataset?.type !== "formula-container") return;
+
+        if (target?.dataset?.type !== "formula") return;
+
+        const range = document.createRange();
+        console.log("change", target?.blur, range);
+
+        range.setStartAfter(container);
+        range.setEndAfter(container);
+        setDOMRange(range);
+
+        target.blur();
+        this.element.focus();
+    };
+
     private onMathBlur = (evt: FocusEvent) => {
         const target = evt.target as MathfieldElement;
 
@@ -237,11 +257,11 @@ export default class Editor {
         if (container?.dataset?.type !== "formula-container") return;
 
         const selection = window.getSelection();
-        const range = document.createRange();
         const formula = container.firstChild as MathfieldElement;
 
         if (target === formula) {
             console.log("formula key press");
+            evt.stopImmediatePropagation();
             return;
         }
 
@@ -252,29 +272,29 @@ export default class Editor {
             }, 0);
         }
 
-        if (evt.key === "ArrowLeft") {
-            console.log(
-                evt.key,
-                this.getSelection(),
-                this.tokenForPos(Math.max(range[0], 0), true)
-            );
-        } else if (evt.key === "ArrowRight") {
-            console.log(
-                evt.key,
-                this.getSelection(),
-                this.tokenForPos(Math.max(range[0], 0))
-            );
-        }
+        const range = document.createRange();
 
+        const range2 = getTextRange(this.element);
+        console.log("range2", range2);
+
+        //TODO: FIX RANGE??
         if (evt.key === "ArrowLeft") {
+            console.log("ArrowLeft", target, container, range);
             range.setStartBefore(container);
-            range.setEndBefore(container);
+            range.setEndAfter(container);
+            //range.collapse(true)
+            console.log("Arrow2", target, container, range);
+
             setDOMRange(range);
             //range.collapse(false);
         } else if (evt.key === "ArrowRight") {
             //range.setStartAfter(target);
-            range.setStartAfter(container);
+            console.log("ArrowRight", target, container, range);
+            range.setStartBefore(container);
             range.setEndAfter(container);
+            //range.collapse()
+
+            console.log("Arrow2", target, container, range);
             setDOMRange(range);
 
             // range.setStart(target, 4);
@@ -311,6 +331,33 @@ export default class Editor {
         const range = getTextRange(this.element);
 
         const target = evt.target as HTMLElement;
+
+        if (target.dataset?.type === "formula-container") return;
+
+        const focusMathToken = (token: Token) => {
+            if (!token || token.type !== TokenType.Formula || !token.id) return;
+
+            const elem = document.querySelector(
+                `[data-id="${token.id}"]`
+            ) as HTMLElement;
+
+            if (!elem || elem?.dataset?.type !== "formula-container") return;
+
+            if (this.element === document.activeElement) {
+                this.element.blur();
+                elem.focus();
+            }
+        };
+
+        let token;
+
+        if (evt.key === "ArrowLeft") {
+            token = this.tokenForPos(Math.max(range[0], 0), true);
+            focusMathToken(token);
+        } else if (evt.key === "ArrowRight") {
+            token = this.tokenForPos(Math.max(range[0], 0));
+            focusMathToken(token);
+        }
 
         if (!evt.defaultPrevented) {
             this.shortcuts.handle(evt);
@@ -572,6 +619,7 @@ export default class Editor {
         // * В Windows при использорвании нативной панели с эмоджи, само эмоджи
         //   вставляется через два события input: insertCompositionText и insertText
         // element.addEventListener("focus", this.onMathFocus, true);
+        element.addEventListener("change", this.onMathChange);
         element.addEventListener("blur", this.onMathBlur, true);
         element.addEventListener("keydown", this.onMathKeyDown);
         element.addEventListener("beforeinput", this.onMathBeforeInput);

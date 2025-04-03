@@ -401,9 +401,9 @@ class ReconcileState {
 
             //node.body.appendChild(bomNode);
             node.contentEditable = "false";
-            node.style.userSelect = "all";
-            node.style.display = "inline-block";
-            node.tabIndex = 0;
+            node.style.userSelect = "none";
+            node.style.display = "inline";
+            // node.tabIndex = 0;
 
             node.setAttribute("data-type", "formula-container");
             node.setAttribute("data-raw", token.value);
