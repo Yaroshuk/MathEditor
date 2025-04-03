@@ -388,13 +388,13 @@ class ReconcileState {
 
     mathfield(token: TokenFormula): HTMLElement {
         let node = this.container.childNodes[this.pos] as HTMLElement;
-        console.log("RENDER", token)
+        console.log("RENDER", token);
 
         if (
             !isElement(node) ||
             node?.dataset?.type !== "formula-container" ||
             token.value !== node.dataset.raw ||
-            token.id !== node.dataset.id ||
+            // token.id !== node.dataset.id ||
             token.event !== node.dataset.event
         ) {
             node = document.createElement("button");
@@ -403,28 +403,30 @@ class ReconcileState {
             node.contentEditable = "false";
             node.style.userSelect = "all";
             node.style.display = "inline-block";
+            node.tabIndex = 0;
+
             node.setAttribute("data-type", "formula-container");
-            node.setAttribute("data-id", token.id);
             node.setAttribute("data-raw", token.value);
             node.setAttribute("data-event", token.event);
             //node.style.position = 'relative';
 
             let mathinput = new MathfieldElement();
             mathinput.setAttribute("data-type", "formula");
-            node.append(mathinput);
 
             mathinput.value = token.value;
 
+            node.append(mathinput);
             if (token.event === FormulaEvent.Create) {
                 setTimeout(() => {
                     this.container.blur();
                     mathinput.focus();
                 }, 0);
-            } else {
-                mathinput.contentEditable = "false";
-                mathinput.style.userSelect = "none";
-                mathinput.style.display = "inline-block";
             }
+            // } else {
+            //     mathinput.contentEditable = "false";
+            //     mathinput.style.userSelect = "none";
+            //     mathinput.style.display = "inline-block";
+            // }
 
             // mathinput.autofocus = true;
             // mathinput.focus();
@@ -436,6 +438,8 @@ class ReconcileState {
 
             insertAt(this.container, node, this.pos);
         }
+
+        node.setAttribute("data-id", token.id);
 
         // if (!isElement(mathinput) || mathinput?.dataset?.type !== "formula") {
         // }

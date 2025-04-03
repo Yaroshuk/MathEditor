@@ -143,13 +143,16 @@ export default class Editor {
     private onMathBlur = (evt: FocusEvent) => {
         const target = evt.target as MathfieldElement;
 
-        if (target.dataset?.type !== "formula") return;
+        let container = target.closest("button");
 
-        const parent = target.parentElement;
+        if (container?.dataset?.type !== "formula-container") return;
 
-        if (parent.dataset?.type !== "formula-container") return;
+        const mathinput = container.firstChild as MathfieldElement;
 
-        const id = parent.dataset?.id;
+        if (mathinput?.dataset?.type !== "formula") return;
+
+        const id = container.dataset?.id;
+
         //parent.setAttribute("data-raw", target?.value);
 
         let nextModel = this.model;
@@ -160,9 +163,11 @@ export default class Editor {
             if (token?.id === id) {
                 return {
                     ...token,
-                    value: `${target?.value.at(0) === "$" ? "" : "$"}${String(
-                        target?.value
-                    ).trim()}${target?.value.at(-1) === "$" ? "" : "$"}`,
+                    value: `${
+                        mathinput?.value.at(0) === "$" ? "" : "$"
+                    }${String(mathinput?.value).trim()}${
+                        mathinput?.value.at(-1) === "$" ? "" : "$"
+                    }`,
                     event: FormulaEvent.Update,
                 };
             }
@@ -178,7 +183,11 @@ export default class Editor {
 
         const range = getTextRange(this.element);
 
+        console.log("Mathfield", this.model, nextModel, mathinput?.value);
+
         this.updateModel(nextModel, false, range);
+        this.syncUI();
+
         //evt.stopImmediatePropagation();
     };
 
@@ -211,9 +220,6 @@ export default class Editor {
         });
 
         this.updateModel(nextModel, false, [0, 0]);
-
-        console.log("Mathfield", mathinput);
-
         // if (target.dataset?.type !== "formula") return;
 
         // const parent = target.parentElement;
@@ -226,25 +232,77 @@ export default class Editor {
     private onMathKeyDown = (evt: KeyboardEvent) => {
         const target = evt.target as HTMLElement;
 
-        console.log(target, this.getSelection());
+        let container = target.closest("button");
 
-        if (target.dataset?.type !== "formula") return;
+        if (container?.dataset?.type !== "formula-container") return;
 
-        evt.stopImmediatePropagation();
+        const selection = window.getSelection();
+        const range = document.createRange();
+        const formula = container.firstChild as MathfieldElement;
+
+        if (target === formula) {
+            console.log("formula key press");
+            return;
+        }
+
+        if (evt.key === "Enter") {
+            setTimeout(() => {
+                console.log("Enter", formula);
+                formula.focus();
+            }, 0);
+        }
+
+        if (evt.key === "ArrowLeft") {
+            console.log(
+                evt.key,
+                this.getSelection(),
+                this.tokenForPos(Math.max(range[0], 0), true)
+            );
+        } else if (evt.key === "ArrowRight") {
+            console.log(
+                evt.key,
+                this.getSelection(),
+                this.tokenForPos(Math.max(range[0], 0))
+            );
+        }
+
+        if (evt.key === "ArrowLeft") {
+            range.setStartBefore(container);
+            range.setEndBefore(container);
+            setDOMRange(range);
+            //range.collapse(false);
+        } else if (evt.key === "ArrowRight") {
+            //range.setStartAfter(target);
+            range.setStartAfter(container);
+            range.setEndAfter(container);
+            setDOMRange(range);
+
+            // range.setStart(target, 4);
+            // range.setEnd(target, 4);
+        }
+
+        //if (target.dataset?.type !== "formula") return;
+
+        //evt.preventDefault();
+        // evt.stopPropagation();
+        // evt.stopImmediatePropagation();
+        // return;
     };
 
     private onMathBeforeInput = (evt: InputEvent) => {
         const target = evt.target as HTMLElement;
+        let container = target.closest("button");
 
-        if (target.dataset?.type !== "formula") return;
+        if (container?.dataset?.type !== "formula-container") return;
 
         evt.stopImmediatePropagation();
     };
 
     private onMathInput = (evt: InputEvent) => {
         const target = evt.target as HTMLElement;
+        let container = target.closest("button");
 
-        if (target.dataset?.type !== "formula") return;
+        if (container?.dataset?.type !== "formula-container") return;
 
         evt.stopImmediatePropagation();
     };
@@ -253,20 +311,6 @@ export default class Editor {
         const range = getTextRange(this.element);
 
         const target = evt.target as HTMLElement;
-
-        if (evt.key === "ArrowLeft") {
-            console.log(
-                evt.key,
-                this.getSelection(),
-                this.tokenForPos(Math.max(range[0], 0), true)
-            );
-        } else {
-            console.log(
-                evt.key,
-                this.getSelection(),
-                this.tokenForPos(Math.max(range[0], 0))
-            );
-        }
 
         if (!evt.defaultPrevented) {
             this.shortcuts.handle(evt);
@@ -527,9 +571,9 @@ export default class Editor {
         //   insertText: null, а не beforeinput: deleteContentForward
         // * В Windows при использорвании нативной панели с эмоджи, само эмоджи
         //   вставляется через два события input: insertCompositionText и insertText
-        element.addEventListener("focus", this.onMathFocus, true);
+        // element.addEventListener("focus", this.onMathFocus, true);
         element.addEventListener("blur", this.onMathBlur, true);
-        // element.addEventListener("keydown", this.onMathKeyDown);
+        element.addEventListener("keydown", this.onMathKeyDown);
         element.addEventListener("beforeinput", this.onMathBeforeInput);
         element.addEventListener("input", this.onMathInput);
         element.addEventListener("keydown", this.onKeyDown);

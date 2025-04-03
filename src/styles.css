@@ -11,6 +11,11 @@
   min-height: 300px;
 }
 
+[data-type="formula-container"] {
+  user-select: all;
+  -webkit-user-select: all;
+}
+
 /* math-field {
   width: 100px !important;
   height: 100px !important;
