@@ -467,13 +467,101 @@ export default class Editor {
     };
 
     private onSelectionChange = () => {
-        if (this.dirty !== DirtyState.None) {
-            return;
-        }
-
         const range = getTextRange(this.element);
-        if (range) {
-            this.saveSelection(range);
+
+        let token = this.tokenForPos(range[1]);
+        if (token?.type === TokenType.Newline) {
+            let nextRange = range?.[1] || 1;
+
+            while (token?.type === TokenType.Newline && nextRange !== 0) {
+                nextRange -= 1;
+                token = this.tokenForPos(nextRange);
+            }
+        }
+        // if (token?.type === TokenType.Newline) {
+        //     token = this.tokenForPos(range[1] - 1);
+        // }
+        console.log("selection", range, token);
+        // if (
+        //     isElement(getCaretElement()) &&
+        //     (getCaretElement() as HTMLElement).dataset?.type === "caret"
+        // ) {
+        //     console.log("click caret", getCaretElement());
+        //     return;
+        // }
+
+        if (token?.type && token.type === TokenType.Formula) {
+            let nextModel = this.model;
+
+            const index = this.model.findIndex((item) => {
+                if (item.type !== TokenType.Formula) return false;
+
+                if (item.id === token.id) return true;
+
+                return false;
+            });
+            //&& nextModel[index + 1]?.format !== 4
+            if (
+                index !== -1 &&
+                nextModel?.[index + 1]?.type !== TokenType.Caret
+            ) {
+                // console.log(
+                //     "NEXT TOKENS",
+                //     nextModel?.[index + 1],
+                //     nextModel?.[index + 2]
+                // );
+                nextModel.splice(index + 1, 0, {
+                    type: TokenType.Caret,
+                    value: "\u2619",
+                    format: TokenFormat.None,
+                });
+                console.log("NEXT MODEL", nextModel);
+
+                // this.caretAim = document.createElement("span");
+                // this.caretAim.innerHTML = "!"; //"\uFEFF";
+                // this.caretAim.setAttribute("data-type", "caret");
+
+                console.log("click elem", index, nextModel);
+
+                this.updateModel(nextModel, false, range);
+                this.syncUI();
+            }
+            // if (elem) {
+            //     elem.insertAdjacentElement("afterend", this.caretAim);
+            // }
+
+            // setTimeout(() => {
+            //     caret?.remove();
+            // }, 1000);
+
+            // if (!this.caretAim) {
+            //     this.caretAim = document.createElement("span");
+            //     this.caretAim.innerHTML = "\uFEFF";
+            // }
+        }
+        // else if (token?.format !== 4) {
+        //     console.log("click token", token);
+        //     let nextModel = this.model;
+
+        //     const index = this.model.findIndex((item) => {
+        //         if (item.format === 4) return true;
+
+        //         return false;
+        //     });
+
+        //     if (index !== -1) {
+        //         nextModel.splice(index, 1);
+        //         this.updateModel(nextModel, false, range);
+        //         this.syncUI();
+
+        //         console.log("!!!click elem", index, nextModel);
+        //     }
+        // }
+
+        if (this.dirty === DirtyState.None) {
+            if (range) {
+                this.saveSelection(range);
+            }
         }
     };
 

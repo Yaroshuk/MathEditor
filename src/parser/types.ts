@@ -69,6 +69,8 @@ export enum TokenType {
     Newline = "newline",
 
     Formula = "formula",
+
+    Caret = "caret",
 }
 
 export enum FormulaEvent {
@@ -119,7 +121,8 @@ export type Token =
     | TokenHashTag
     | TokenMarkdown
     | TokenNewline
-    | TokenFormula;
+    | TokenFormula
+    | TokenCaret;
 
 export interface TokenBase {
     /** Тип токена */
@@ -134,6 +137,8 @@ export interface TokenBase {
     /** Список эмоджи внутри значения токена */
     emoji?: Emoji[];
 }
+
+export interface TokenCaret extends TokenBase {}
 
 export interface TokenText extends TokenBase {
     type: TokenType.Text;
