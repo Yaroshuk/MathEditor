@@ -10,7 +10,7 @@ import hashtag from "./hashtag";
 import link from "./link";
 import markdown from "./markdown";
 import newline from "./newline";
-import formula from "./formula";
+import formulaCreator from "./formula-creator";
 import formulaReader from "./formula-reader";
 import { normalize, defaultOptions } from "./utils";
 import { objectMerge } from "../utils/objectMerge";
@@ -35,7 +35,7 @@ export default function parse(
     }
 
     while (state.hasNext()) {
-        formula(state) ||
+        formulaCreator(state) ||
             formulaReader(state) ||
             markdown(state) ||
             newline(state) ||

@@ -401,7 +401,7 @@ class ReconcileState {
 
             //node.body.appendChild(bomNode);
             node.contentEditable = "false";
-            node.style.userSelect = "none";
+            node.style.userSelect = "all";
             node.style.display = "inline";
             node.style.width = "fit-content";
             node.style.padding = "0"

@@ -1,7 +1,7 @@
-import { TokenFormat, TokenType } from './types';
-import type { ParserOptions, Emoji, Token, TokenLink } from './types';
-import type ParserState from './state';
-import { objectMerge } from '../utils/objectMerge';
+import { TokenFormat, TokenType } from "./types";
+import type { ParserOptions, Emoji, Token, TokenLink } from "./types";
+import type ParserState from "./state";
+import { objectMerge } from "../utils/objectMerge";
 
 export const Codes = {
     // Formatting
@@ -88,33 +88,48 @@ export const Codes = {
     At: 64,
     /** # */
     Hash: 35,
-      /** $ */
-  Dollar: 36,
-}
+    /** $ */
+    Dollar: 36,
+};
 
 const boundPunctuation = new Set<number>([
-    Codes.DoubleQuote, Codes.SingleQuote, Codes.SemiColon,
-    Codes.RoundBracketOpen, Codes.RoundBracketClose,
-    Codes.SquareBracketOpen, Codes.SquareBracketClose,
-    Codes.CurlyBracketOpen, Codes.CurlyBracketClose,
+    Codes.DoubleQuote,
+    Codes.SingleQuote,
+    Codes.SemiColon,
+    Codes.RoundBracketOpen,
+    Codes.RoundBracketClose,
+    Codes.SquareBracketOpen,
+    Codes.SquareBracketClose,
+    Codes.CurlyBracketOpen,
+    Codes.CurlyBracketClose,
 ]);
 
 const punctuation = new Set<number>([
-    Codes.Exclamation, Codes.Comma, Codes.Dot, Codes.Colon, Codes.Question,
-    Codes.Hyphen, Codes.EnDash, Codes.EmDash
+    Codes.Exclamation,
+    Codes.Comma,
+    Codes.Dot,
+    Codes.Colon,
+    Codes.Question,
+    Codes.Hyphen,
+    Codes.EnDash,
+    Codes.EmDash,
 ]);
 
 const delimiterPunctuation = new Set<number>([
-    Codes.Exclamation, Codes.Comma, Codes.Dot, Codes.SemiColon, Codes.Question
+    Codes.Exclamation,
+    Codes.Comma,
+    Codes.Dot,
+    Codes.SemiColon,
+    Codes.Question,
 ]);
 
 // https://jkorpela.fi/chars/spaces.html
 const whiteSpace = new Set<number>([
     Codes.Tab,
     0x0020, // SPACE
-    0x00A0, // NO-BREAK SPACE
+    0x00a0, // NO-BREAK SPACE
     0x1680, // OGHAM SPACE MARK
-    0x180E, // MONGOLIAN VOWEL SEPARATOR
+    0x180e, // MONGOLIAN VOWEL SEPARATOR
     0x2000, // EN QUAD
     0x2001, // EM QUAD
     0x2002, // EN SPACE (nut)
@@ -125,14 +140,14 @@ const whiteSpace = new Set<number>([
     0x2007, // FIGURE SPACE
     0x2008, // PUNCTUATION SPACE
     0x2009, // THIN SPACE
-    0x200A, // HAIR SPACE
-    0x200B, // ZERO WIDTH SPACE
+    0x200a, // HAIR SPACE
+    0x200b, // ZERO WIDTH SPACE
     0x2028, // LINE SEPARATOR
     0x2029, // PARAGRAPH SEPARATOR
-    0x202F, // NARROW NO-BREAK SPACE
-    0x205F, // MEDIUM MATHEMATICAL SPACE
+    0x202f, // NARROW NO-BREAK SPACE
+    0x205f, // MEDIUM MATHEMATICAL SPACE
     0x3000, // IDEOGRAPHIC SPACE
-    0xFEFF, // ZERO WIDTH NO-BREAK SPACE
+    0xfeff, // ZERO WIDTH NO-BREAK SPACE
 ]);
 
 export const defaultOptions: ParserOptions = {
@@ -164,29 +179,30 @@ export function isWhitespace(ch: number): boolean {
 }
 
 export function isNewLine(ch: number): boolean {
-    return ch === Codes.NewLine
-        || ch === Codes.Return
-        || ch === Codes.LineFeed;
+    return ch === Codes.NewLine || ch === Codes.Return || ch === Codes.LineFeed;
 }
 
 export function isMarkdown(ch: number): boolean {
-    return ch === Codes.Asterisk
-        || ch === Codes.Underscore
-        || ch === Codes.Tilde
-        || ch === Codes.BackTick;
+    return (
+        ch === Codes.Asterisk ||
+        ch === Codes.Underscore ||
+        ch === Codes.Tilde ||
+        ch === Codes.BackTick
+    );
 }
 
 export function isBound(ch?: number): boolean {
-    return ch === undefined
-        || ch !== ch /* NaN */
-        || isNewLine(ch)
-        || isWhitespace(ch)
+    return (
+        ch === undefined ||
+        ch !== ch /* NaN */ ||
+        isNewLine(ch) ||
+        isWhitespace(ch)
+    );
 }
 
 export function isDelimiter(ch?: number): boolean {
-    return isBound(ch)
-        || isBoundPunctuation(ch);
-        // || isMarkdown(ch);
+    return isBound(ch) || isBoundPunctuation(ch);
+    // || isMarkdown(ch);
 }
 
 /**
@@ -194,9 +210,7 @@ export function isDelimiter(ch?: number): boolean {
  * символы, цифры подчёркивание и дефис
  */
 export function isIdentifier(ch: number): boolean {
-    return ch === Codes.Underscore
-        || ch === Codes.Hyphen
-        || isAlphaNumeric(ch);
+    return ch === Codes.Underscore || ch === Codes.Hyphen || isAlphaNumeric(ch);
 }
 
 /**
@@ -213,19 +227,23 @@ export function consumeIdentifier(state: ParserState): boolean {
 }
 
 export function consumeNumbers(state: ParserState): boolean {
-  // Идентификатор обязательно должен начинаться с латинского символа
-  if (state.consume(isNumber)) {
-      state.consumeWhile(isNumber);
-      return true;
-  }
+    // Идентификатор обязательно должен начинаться с латинского символа
+    if (state.consume(isNumber)) {
+        state.consumeWhile(isNumber);
+        return true;
+    }
 
-  return false;
+    return false;
 }
 
 /**
  * Вернёт `true`, если все коды из `arr` были поглощены из текущей позиции потока
  */
-export function consumeArray(state: ParserState, arr: number[], ignoreCase?: boolean): boolean {
+export function consumeArray(
+    state: ParserState,
+    arr: number[],
+    ignoreCase?: boolean
+): boolean {
     const { pos } = state;
     let ch: number;
     for (let i = 0; i < arr.length; i++) {
@@ -251,7 +269,9 @@ export function last<T>(arr: T[]): T | undefined {
 export function toCode(str: string, ignoreCase?: boolean): number[] {
     const result: number[] = [];
     for (let i = 0; i < str.length; i++) {
-        result.push(ignoreCase ? asciiToUpper(str.charCodeAt(i)) : str.charCodeAt(i));
+        result.push(
+            ignoreCase ? asciiToUpper(str.charCodeAt(i)) : str.charCodeAt(i)
+        );
     }
 
     return result;
@@ -295,60 +315,70 @@ export function isQuote(ch: number): boolean {
  * Check if given character code is simple letter of supported alphabets
  */
 export function isMultiAlpha(code: number): boolean {
-    return isAlpha(code) || // a-zA-Z
-        code === 1105 || code === 1025 || // Ёё
-        code >= 1040 && code <= 1103 || // Аа-Яя
-        code >= 1568 && code <= 1599 || // Arabic and Farsi letters
-        code >= 1601 && code <= 1610 || // Arabic letters
-        code === 1662 || code === 1670 || code === 1688 || code === 1703 || code === 1705 || code === 1711 || // arabic letters
-        code >= 1729 && code <= 1731 || // Arabic letters
+    return (
+        isAlpha(code) || // a-zA-Z
+        code === 1105 ||
+        code === 1025 || // Ёё
+        (code >= 1040 && code <= 1103) || // Аа-Яя
+        (code >= 1568 && code <= 1599) || // Arabic and Farsi letters
+        (code >= 1601 && code <= 1610) || // Arabic letters
+        code === 1662 ||
+        code === 1670 ||
+        code === 1688 ||
+        code === 1703 ||
+        code === 1705 ||
+        code === 1711 || // arabic letters
+        (code >= 1729 && code <= 1731) || // Arabic letters
         code === 1740 || // Arabic letters
-        code >= 1641 && code <= 1776; // Arabic and Persian numbers
+        (code >= 1641 && code <= 1776)
+    ); // Arabic and Persian numbers
 }
 
 /**
  * All unicode character set alpha like
  */
 export function isUnicodeAlpha(code: number): boolean {
-    return isAlpha(code)
-        || code >= 880 && code <= 1023   // Greek and Coptic
-        || code >= 1024 && code <= 1279  // Cyrillic
-        || code >= 1280 && code <= 1327  // Cyrillic Supplementary
-        || code >= 1328 && code <= 1423  // Armenian
-        || code >= 1424 && code <= 1535  // Hebrew
-        || code >= 1536 && code <= 1791  // Arabic
-        || code >= 19968 && code <= 40959 // Chinese
-        || code >= 1792 && code <= 1871  // Syriac
-        || code >= 1920 && code <= 1983  // Thaana
-        || code >= 2304 && code <= 2431  // Devanagari
-        || code >= 2432 && code <= 2559  // Bengali
-        || code >= 2560 && code <= 2687  // Gurmukhi
-        || code >= 2688 && code <= 2815  // Gujarati
-        || code >= 2816 && code <= 2943  // Oriya
-        || code >= 2944 && code <= 3071  // Tamil
-        || code >= 3072 && code <= 3199  // Telugu
-        || code >= 3200 && code <= 3327  // Kannada
-        || code >= 3328 && code <= 3455  // Malayalam
-        || code >= 3456 && code <= 3583  // Sinhala
-        || code >= 3584 && code <= 3711  // Thai
-        || code >= 3712 && code <= 3839  // Lao
-        || code >= 3840 && code <= 4095  // Tibetan
-        || code >= 4096 && code <= 4255  // Myanmar
-        || code >= 4256 && code <= 4351  // Georgian
-        || code >= 4352 && code <= 4607  // Hangul Jamo
-        || code >= 4608 && code <= 4991  // Ethiopic
-        || code >= 5024 && code <= 5119  // Cherokee
-        || code >= 5120 && code <= 5759  // Unified
-        || code >= 5760 && code <= 5791  // Ogham
-        || code >= 5792 && code <= 5887  // Runic
-        || code >= 5888 && code <= 5919  // Tagalog
-        || code >= 5920 && code <= 5951  // Hanunoo
-        || code >= 5952 && code <= 5983  // Buhid
-        || code >= 5984 && code <= 6015  // Tagbanwa
-        || code >= 6016 && code <= 6143  // Khmer
-        || code >= 6144 && code <= 6319  // Mongolian
-        || code >= 6400 && code <= 6479  // Limbu
-        || code >= 6480 && code <= 6527; // Tai Le
+    return (
+        isAlpha(code) ||
+        (code >= 880 && code <= 1023) || // Greek and Coptic
+        (code >= 1024 && code <= 1279) || // Cyrillic
+        (code >= 1280 && code <= 1327) || // Cyrillic Supplementary
+        (code >= 1328 && code <= 1423) || // Armenian
+        (code >= 1424 && code <= 1535) || // Hebrew
+        (code >= 1536 && code <= 1791) || // Arabic
+        (code >= 19968 && code <= 40959) || // Chinese
+        (code >= 1792 && code <= 1871) || // Syriac
+        (code >= 1920 && code <= 1983) || // Thaana
+        (code >= 2304 && code <= 2431) || // Devanagari
+        (code >= 2432 && code <= 2559) || // Bengali
+        (code >= 2560 && code <= 2687) || // Gurmukhi
+        (code >= 2688 && code <= 2815) || // Gujarati
+        (code >= 2816 && code <= 2943) || // Oriya
+        (code >= 2944 && code <= 3071) || // Tamil
+        (code >= 3072 && code <= 3199) || // Telugu
+        (code >= 3200 && code <= 3327) || // Kannada
+        (code >= 3328 && code <= 3455) || // Malayalam
+        (code >= 3456 && code <= 3583) || // Sinhala
+        (code >= 3584 && code <= 3711) || // Thai
+        (code >= 3712 && code <= 3839) || // Lao
+        (code >= 3840 && code <= 4095) || // Tibetan
+        (code >= 4096 && code <= 4255) || // Myanmar
+        (code >= 4256 && code <= 4351) || // Georgian
+        (code >= 4352 && code <= 4607) || // Hangul Jamo
+        (code >= 4608 && code <= 4991) || // Ethiopic
+        (code >= 5024 && code <= 5119) || // Cherokee
+        (code >= 5120 && code <= 5759) || // Unified
+        (code >= 5760 && code <= 5791) || // Ogham
+        (code >= 5792 && code <= 5887) || // Runic
+        (code >= 5888 && code <= 5919) || // Tagalog
+        (code >= 5920 && code <= 5951) || // Hanunoo
+        (code >= 5952 && code <= 5983) || // Buhid
+        (code >= 5984 && code <= 6015) || // Tagbanwa
+        (code >= 6016 && code <= 6143) || // Khmer
+        (code >= 6144 && code <= 6319) || // Mongolian
+        (code >= 6400 && code <= 6479) || // Limbu
+        (code >= 6480 && code <= 6527)
+    ); // Tai Le
 }
 
 export function isCommandName(ch: number): boolean {
@@ -374,7 +404,7 @@ export function normalize(tokens: Token[]): Token[] {
  * Возвращает строковое содержимое указанных токенов
  */
 export function getText(tokens: Token[]): string {
-    return tokens.map(token => token.value).join('');
+    return tokens.map((token) => token.value).join("");
 }
 
 /**
@@ -404,10 +434,10 @@ function polyfillCodePointAt(str: string, pos: number): number {
 
     const first = str.charCodeAt(pos);
 
-    if (first >= 0xD800 && first <= 0xDBFF && size > pos + 1) {
+    if (first >= 0xd800 && first <= 0xdbff && size > pos + 1) {
         const second = str.charCodeAt(pos + 1);
-        if (second >= 0xDC00 && second <= 0xDFFF) {
-            return (first - 0xD800) * 0x400 + second - 0xDC00 + 0x10000;
+        if (second >= 0xdc00 && second <= 0xdfff) {
+            return (first - 0xd800) * 0x400 + second - 0xdc00 + 0x10000;
         }
     }
     return first;
@@ -417,7 +447,10 @@ function polyfillCodePointAt(str: string, pos: number): number {
  * Удаляет пустые токены из указанного списка
  */
 function filterEmpty(tokens: Token[]): Token[] {
-    return tokens.filter(token => token.value || (token.type === TokenType.Text && token.sticky));
+    return tokens.filter(
+        (token) =>
+            token.value || (token.type === TokenType.Text && token.sticky)
+    );
 }
 
 /**
@@ -431,7 +464,9 @@ function joinSimilar(tokens: Token[]): Token[] {
 
             if (token.emoji) {
                 const nextEmoji = shiftEmoji(token.emoji, prev.value.length);
-                prev.emoji = prev.emoji ? prev.emoji.concat(nextEmoji) : nextEmoji;
+                prev.emoji = prev.emoji
+                    ? prev.emoji.concat(nextEmoji)
+                    : nextEmoji;
             }
 
             prev.value += token.value;
@@ -449,16 +484,23 @@ function joinSimilar(tokens: Token[]): Token[] {
  */
 function allowJoin(token1: Token, token2: Token): boolean {
     if (token1.type === token2.type && token1.format === token2.format) {
-        return (token1.type === TokenType.Link && token1.link === (token2 as TokenLink).link && isCustomLink(token1) && isCustomLink(token2))
-            || token1.type === TokenType.Text;
+        return (
+            (token1.type === TokenType.Link &&
+                token1.link === (token2 as TokenLink).link &&
+                isCustomLink(token1) &&
+                isCustomLink(token2)) ||
+            token1.type === TokenType.Text
+        );
     }
 }
 
 function shiftEmoji(emoji: Emoji[], offset: number): Emoji[] {
-    return emoji.map(e => objectMerge(e, {
-        from: e.from + offset,
-        to: e.to + offset
-    }));
+    return emoji.map((e) =>
+        objectMerge(e, {
+            from: e.from + offset,
+            to: e.to + offset,
+        })
+    );
 }
 
 /**
