@@ -90,6 +90,8 @@ export const Codes = {
     Hash: 35,
     /** $ */
     Dollar: 36,
+    /** \u200B */
+    ZeroSpace: 8203,
 };
 
 const boundPunctuation = new Set<number>([

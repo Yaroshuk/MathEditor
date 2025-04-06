@@ -1,3 +1,4 @@
+import type { Mathfield, MathfieldElement, Selector } from "mathlive";
 import type { Tree } from "./tree";
 
 export interface ParserOptions {
@@ -196,10 +197,13 @@ export interface TokenNewline extends TokenBase {
     type: TokenType.Newline;
 }
 
+interface FormulaCommand {}
+
 export interface TokenFormula extends TokenBase {
     type: TokenType.Formula;
     event: FormulaEvent;
     id: string;
+    command?: Parameters<MathfieldElement["executeCommand"]>[0];
 }
 
 export interface EmojiData {

@@ -404,7 +404,7 @@ class ReconcileState {
             node.style.userSelect = "all";
             node.style.display = "inline";
             node.style.width = "fit-content";
-            node.style.padding = "0"
+            node.style.padding = "0";
             node.style.border = "none";
             // node.tabIndex = 0;
 
@@ -414,8 +414,8 @@ class ReconcileState {
             //node.style.position = 'relative';
 
             let mathinput = new MathfieldElement();
-            mathinput.style.margin = "0"
-            mathinput.style.padding = "0"
+            mathinput.style.margin = "0";
+            mathinput.style.padding = "0";
             mathinput.setAttribute("data-type", "formula");
 
             mathinput.value = token.value;
@@ -425,6 +425,10 @@ class ReconcileState {
                 setTimeout(() => {
                     this.container.blur();
                     mathinput.focus();
+
+                    if (token.command) {
+                        mathinput.executeCommand(token.command);
+                    }
                 }, 0);
             }
             // } else {
