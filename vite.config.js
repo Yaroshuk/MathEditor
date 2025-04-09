@@ -5,13 +5,13 @@ export default defineConfig({
     define: {
         global: "window",
     },
-    base: "./MathEditor",
-    build: {
-        commonjsOptions: { transformMixedEsModules: true },
-        rollupOptions: {
-            input: {
-                main: path.resolve(__dirname, "index.html"),
-            },
-        },
-    },
+    base: "./MathEditor/",
+    // build: {
+    //     commonjsOptions: { transformMixedEsModules: true },
+    //     rollupOptions: {
+    //         input: {
+    //             main: path.resolve(__dirname, "index.html"),
+    //         },
+    //     },
+    // },
 });
