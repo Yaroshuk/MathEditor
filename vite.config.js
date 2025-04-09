@@ -5,7 +5,7 @@ export default defineConfig({
     define: {
         global: "window",
     },
-    base: "./MathEditor/",
+    base: "/MathEditor/",
     // build: {
     //     commonjsOptions: { transformMixedEsModules: true },
     //     rollupOptions: {
