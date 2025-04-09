@@ -16,7 +16,7 @@ const shortcuts: Record<string, (editor: Editor) => void> = {
 let activeEditor: Editor;
 const toolbar = document.querySelector<HTMLElement>('.toolbar');
 const editor = new Editor(document.querySelector('#text-editor'), {
-    value: 'Привет, мир! 😇',
+    value: 'Hello, Amy! 😇',
     shortcuts,
     parse: {
         // textEmoji: true,
@@ -33,7 +33,7 @@ const editor = new Editor(document.querySelector('#text-editor'), {
     scroller: document.querySelector('#text-editor-scroller')
 });
 editor
-    .on('editor-selectionchange', (evt: CustomEvent) => onSelectionChange(evt.detail.editor))
+    //.on('editor-selectionchange', (evt: CustomEvent) => onSelectionChange(evt.detail.editor))
     .on('editor-formatchange', (evt: CustomEvent) => updateToolbarState(evt.detail.editor));
 
 //createRectObserver(editor)
@@ -101,16 +101,16 @@ function renderEmoji(emoji: string, elem: HTMLElement) {
     return elem;
 }
 
-function onSelectionChange(editor: Editor) {
-    activeEditor = editor;
-    const sel = editor.getSelection();
-    if (sel[0] !== sel[1]) {
-        showToolbar(editor);
-        updateToolbar(editor);
-    } else {
-        hideToolbar();
-    }
-}
+// function onSelectionChange(editor: Editor) {
+//     activeEditor = editor;
+//     const sel = editor.getSelection();
+//     if (sel[0] !== sel[1]) {
+//         showToolbar(editor);
+//         updateToolbar(editor);
+//     } else {
+//         hideToolbar();
+//     }
+// }
 
 function updateToolbar(editor: Editor) {
     const sel = window.getSelection();
