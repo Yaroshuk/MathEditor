@@ -19,7 +19,7 @@
     "clean": "rm -rf ./dist",
     "prepare": "npm test && npm run clean && npm run build && npm run build-parser",
     "predeploy": "yarn run build",
-    "deploy": "gh-pages -d build"
+    "deploy": "gh-pages -d dist"
   },
   "keywords": [],
   "author": "Sergey Chikuyonok <serge.che@gmail.com>",

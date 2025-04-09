@@ -1,13 +1,17 @@
-/** @type {import('vite').UserConfig} */
-const config = {
-    build: {
-        outDir: './dist',
-        lib: {
-            entry: './src/index.ts',
-            fileName: 'editor',
-            formats: ['es', 'cjs'],
-        }
-    }
-};
+import path from "path";
+import { defineConfig } from "vite";
 
-export default config;
+export default defineConfig({
+    define: {
+        global: "window",
+    },
+    base: "./MathEditor",
+    build: {
+        commonjsOptions: { transformMixedEsModules: true },
+        rollupOptions: {
+            input: {
+                main: path.resolve(__dirname, "index.html"),
+            },
+        },
+    },
+});
