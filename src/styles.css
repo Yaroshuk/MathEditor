@@ -1,19 +1,18 @@
 #text-editor {
-  min-height: 300px;
-  border: 1px solid red;
+    min-height: 300px;
+    border: 1px solid red;
 }
 
-#text-editor>div {
-
+#text-editor > div {
 }
 
 #text-editor-scroller {
-  min-height: 300px;
+    min-height: 300px;
 }
 
 [data-type="formula-container"] {
-  user-select: all;
-  -webkit-user-select: all;
+    user-select: all;
+    -webkit-user-select: all;
 }
 
 /* math-field {
@@ -21,11 +20,10 @@
   height: 100px !important;
 } */
 
-/* Hide the virtual keyboard toggle */
-/* math-field::part(virtual-keyboard-toggle) {
-  display: none;
+math-field::part(virtual-keyboard-toggle) {
+    display: none;
 }
 
 math-field::part(menu-toggle) {
-  display: none;
-} */
+    display: none;
+}
